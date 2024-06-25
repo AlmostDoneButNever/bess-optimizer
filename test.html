@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plotly Custom Modebar Button</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div id="chart"></div>
+
+    <script>
+        // Sample data
+        const data = [
+            {
+                x: ['2024-01-01', '2024-02-01', '2024-03-01', '2024-04-01'],
+                y: [10, 15, 13, 17],
+                type: 'scatter'
+            }
+        ];
+
+        // Plot the chart
+        Plotly.newPlot('chart', data, {}, {
+            modeBarButtonsToAdd: [{
+                name: 'Download CSV',
+                icon: Plotly.Icons.disk,
+                click: function(gd) {
+                    // Function to download CSV
+                    const rows = [['Date', 'Value'], ...data[0].x.map((date, i) => [date, data[0].y[i]])];
+                    let csvContent = "data:text/csv;charset=utf-8,";
+
+                    rows.forEach(rowArray => {
+                        let row = rowArray.join(",");
+                        csvContent += row + "\r\n";
+                    });
+
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "chart_data.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                }
+            }]
+        });
+    </script>
+</body>
+</html>
