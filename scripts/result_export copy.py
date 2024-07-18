@@ -1,4 +1,4 @@
-def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_data, result_data, discount_rate):
+def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_power, annual_revenue, price_data, result_data, discount_rate, om_percentage):
 
     # Generate the HTML content with embedded JavaScript
     html_content = f"""
@@ -106,23 +106,47 @@ def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_dat
             <div class="chart-container" id="soc_chart"></div>
         </div>
 
-        <div id="economicAnalysis" class="content">
+        <div id="economicAnalysis" class="content active">
             <h1>Economic Analysis</h1>
+            <div class="input-group">
+                <label for="cap_energy">Capacity Energy (kWh):</label>
+                <input type="number" id="cap_energy" name="cap_energy" value="{cap_energy}" step="1" min="0" readonly>
+            </div>
+            <div class="input-group">
+                <label for="cap_power">Capacity Power (kW):</label>
+                <input type="number" id="cap_power" name="cap_power" value="{cap_power}" step="1" min="0" readonly>
+            </div>
+            <div class="input-group">
+                <label for="BESS_icost">BESS Initial Cost ($):</label>
+                <input type="number" id="BESS_icost" name="BESS_icost" value="{BESS_icost}" step="1" min="0" oninput="updateInitialCost()">
+            </div>
+            <div class="input-group">
+                <label for="BESS_ecost">BESS Energy Cost ($/kWh):</label>
+                <input type="number" id="BESS_ecost" name="BESS_ecost" value="{BESS_ecost}" step="1" min="0" oninput="updateInitialCost()">
+            </div>
+            <div class="input-group">
+                <label for="BESS_pcost">BESS Power Cost ($/kW):</label>
+                <input type="number" id="BESS_pcost" name="BESS_pcost" value="{BESS_pcost}" step="1" min="0" oninput="updateInitialCost()">
+            </div>
+            <div class="input-group">
+                <label for="omPercentage">O&M Cost (% Initial Cost/year):</label>
+                <input type="number" id="omPercentage" name="omPercentage" value="{om_percentage}" step="0.01" min="0" max="100" oninput="updateAnnualCost()">
+            </div>
+            <div class="input-group">
+                <label for="initialCost">Initial Cost ($):</label>
+                <input type="number" id="initialCost" name="initialCost" value="0" step="1" min="0" readonly>
+            </div>
+            <div class="input-group">
+                <label for="annualCost">Annual Cost ($):</label>
+                <input type="number" id="annualCost" name="annualCost" value="0" step="1" min="0" readonly>
+            </div>
+            <div class="input-group">
+                <label for="annualRevenue">Annual Revenue ($):</label>
+                <input type="number" id="annualRevenue" name="annualRevenue" value="{annual_revenue}" step="1" min="0" readonly>
+            </div>
             <div class="input-group">
                 <label for="discountRate">Discount Rate:</label>
                 <input type="number" id="discountRate" name="discountRate" value="{discount_rate}" step="0.01" min="0" max="1" oninput="updateChart()">
-            </div>
-            <div class="input-group">
-                <label for="annualCost">Annual Cost:</label>
-                <input type="number" id="annualCost" name="annualCost" value="{annual_cost}" step="1" min="0" oninput="updateChart()">
-            </div>
-            <div class="input-group">
-                <label for="initialCost">Initial Cost:</label>
-                <input type="number" id="initialCost" name="initialCost" value="{initial_cost}" step="1" min="0" oninput="updateChart()">
-            </div>
-            <div class="input-group">
-                <label for="annualRevenue">Annual Revenue:</label>
-                <input type="number" id="annualRevenue" name="annualRevenue" value="{annual_revenue}" step="1" min="0" oninput="updateChart()">
             </div>
             <div class="input-group">
                 <label for="revenueChange">Annual Revenue Change (%):</label>
@@ -149,10 +173,14 @@ def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_dat
 
         <script>
             const defaultValues = {{
+                BESS_icost: {BESS_icost},
+                BESS_ecost: {BESS_ecost},
+                BESS_pcost: {BESS_pcost},
+                cap_energy: {cap_energy},
+                cap_power: {cap_power},
                 discountRate: {discount_rate},
-                annualCost: {annual_cost},
-                initialCost: {initial_cost},
                 annualRevenue: {annual_revenue},
+                omPercentage: {om_percentage},
                 revenueChange: 0,
                 costChange: 0
             }};
@@ -167,6 +195,25 @@ def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_dat
             resultData.forEach(function(d) {{
                 d.time = new Date(d.time);
             }});
+
+            function updateInitialCost() {{
+                let BESS_icost = parseFloat(document.getElementById('BESS_icost').value);
+                let BESS_ecost = parseFloat(document.getElementById('BESS_ecost').value);
+                let BESS_pcost = parseFloat(document.getElementById('BESS_pcost').value);
+                let cap_energy = parseFloat(document.getElementById('cap_energy').value);
+                let cap_power = parseFloat(document.getElementById('cap_power').value);
+                let initialCost = BESS_icost + (BESS_ecost * cap_energy) + (BESS_pcost * cap_power);
+                document.getElementById('initialCost').value = initialCost.toFixed(2);
+                updateAnnualCost();
+            }}
+
+            function updateAnnualCost() {{
+                let initialCost = parseFloat(document.getElementById('initialCost').value);
+                let omPercentage = parseFloat(document.getElementById('omPercentage').value) / 100;
+                let annualCost = initialCost * omPercentage;
+                document.getElementById('annualCost').value = annualCost.toFixed(2);
+                updateChart();
+            }}
 
             // Prices Chart
             Plotly.newPlot('prices_chart', [
@@ -203,7 +250,7 @@ def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_dat
                     y: priceData.map(item => item.cres_capacity_price),
                     type: 'scatter',
                     mode: 'lines',
-                    name: 'Contigency Reserve Price'
+                    name: 'Contingency Reserve Price'
                 }}
             ], {{
                 title: 'Energy Prices Over Time',
@@ -248,7 +295,7 @@ def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_dat
                     y: resultData.map(item => item.cres),
                     type: 'scatter',
                     mode: 'lines',
-                    name: 'Contigency Reserve Capacity'
+                    name: 'Contingency Reserve Capacity'
                 }}
             ], {{
                 title: 'Operation Schedule',
@@ -285,13 +332,17 @@ def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_dat
             }}
 
             function resetDefaults() {{
+                document.getElementById('BESS_icost').value = defaultValues.BESS_icost;
+                document.getElementById('BESS_ecost').value = defaultValues.BESS_ecost;
+                document.getElementById('BESS_pcost').value = defaultValues.BESS_pcost;
+                document.getElementById('cap_energy').value = defaultValues.cap_energy;
+                document.getElementById('cap_power').value = defaultValues.cap_power;
+                document.getElementById('omPercentage').value = defaultValues.omPercentage;
                 document.getElementById('discountRate').value = defaultValues.discountRate;
-                document.getElementById('annualCost').value = defaultValues.annualCost;
-                document.getElementById('initialCost').value = defaultValues.initialCost;
                 document.getElementById('annualRevenue').value = defaultValues.annualRevenue;
                 document.getElementById('revenueChange').value = defaultValues.revenueChange;
                 document.getElementById('costChange').value = defaultValues.costChange;
-                updateChart();
+                updateInitialCost();
             }}
 
             function calculateIRR(values) {{
@@ -413,7 +464,7 @@ def generate_html(filename, initial_cost, annual_cost, annual_revenue, price_dat
             }}
 
             showSection('bessOptimizationResult'); // Show the first section by default
-            updateChart();
+            updateInitialCost(); // Update initial cost and charts on load
         </script>
     </body>
     </html>

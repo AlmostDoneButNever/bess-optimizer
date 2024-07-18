@@ -1,7 +1,4 @@
-def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_power, annual_revenue, price_data, result_data, revenue_data, discount_rate, om_percentage, project_duration):
-    # Convert revenue_data to a dictionary for JavaScript
-    revenue_data_dict = revenue_data.to_dict()
-
+def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_power, annual_revenue, price_data, result_data, discount_rate, om_percentage):
     # Generate the HTML content with embedded JavaScript
     html_content = f"""
     <!DOCTYPE html>
@@ -117,7 +114,6 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
             <h1>Optimization Result for BESS Operation</h1>
             <p>Optimization results for Battery Energy Storage System (BESS) operation will be displayed here, including price data, charging and discharging schedules, and state of charge over time.</p>
             <div class="chart-container" id="prices_chart"></div>
-            <div class="chart-container" id="revenue_breakdown_chart"></div>
             <div class="chart-container" id="charge_discharge_chart"></div>
             <div class="chart-container" id="soc_chart"></div>
         </div>
@@ -177,7 +173,7 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
             </div>
 
             <div class="metrics">
-                <div>NPV: $<span id="npvValue"></span></div>
+                <div>NPV: <span id="npvValue"></span></div>
                 <div>BCR: <span id="bcrValue"></span></div>
                 <div>ROI: <span id="roiValue"></span>%</div>
                 <div>IRR: <span id="irrValue"></span>%</div>
@@ -199,13 +195,11 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
                 annualRevenue: {annual_revenue},
                 omPercentage: {om_percentage},
                 revenueChange: 0,
-                costChange: 0,
-                projectDuration: {project_duration}
+                costChange: 0
             }};
 
             var priceData = {price_data};
             var resultData = {result_data};
-            var revenueBreakdownData = {revenue_data_dict};
 
             priceData.forEach(function(d) {{
                 d.time = new Date(d.time);
@@ -263,9 +257,9 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
             }}
 
             function calculateFinancialMetrics(discountRate, initialCost, annualCost, annualRevenue, revenueChange, costChange) {{
-                let periods = Array.from({{ length: defaultValues.projectDuration + 1 }}, (_, i) => i);
-                let cashInflows = [0].concat(Array(defaultValues.projectDuration).fill(annualRevenue).map((rev, i) => rev * Math.pow(1 + revenueChange / 100, i)));
-                let cashOutflows = [initialCost].concat(Array(defaultValues.projectDuration).fill(annualCost).map((cost, i) => cost * Math.pow(1 + costChange / 100, i)));
+                let periods = Array.from({{ length: 21 }}, (_, i) => i);
+                let cashInflows = [0].concat(Array(20).fill(annualRevenue).map((rev, i) => rev * Math.pow(1 + revenueChange / 100, i)));
+                let cashOutflows = [initialCost].concat(Array(20).fill(annualCost).map((cost, i) => cost * Math.pow(1 + costChange / 100, i)));
 
                 let netCashFlow = cashInflows.map((inflow, i) => inflow - cashOutflows[i]);
                 let discountedNetCashFlow = netCashFlow.map((flow, i) => flow / Math.pow(1 + discountRate, periods[i]));
@@ -351,7 +345,7 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
                 let netCashFlowLayout = {{
                     title: 'Net Cash Flow with Annual Costs and Revenues',
                     xaxis: {{ title: 'Period' }},
-                    yaxis: {{ title: 'Amount ($)' }},
+                    yaxis: {{ title: 'Amount' }},
                     barmode: 'group',
                     legend: {{ orientation: "h", y: 1.2 }}
                 }};
@@ -359,7 +353,7 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
                 let cumulativeCashFlowLayout = {{
                     title: 'Cumulative Cash Flows',
                     xaxis: {{ title: 'Period' }},
-                    yaxis: {{ title: 'Amount ($)' }},
+                    yaxis: {{ title: 'Amount' }},
                     legend: {{ orientation: "h", y: 1.2 }}
                 }};
 
@@ -483,20 +477,6 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
                     legend: {{ orientation: "h", y: 1.2 }}
                 }}, 
                 {{responsive: true}});
-
-                // Revenue Breakdown Chart
-                Plotly.newPlot('revenue_breakdown_chart', [
-                    {{
-                        labels: Object.keys(revenueBreakdownData),
-                        values: Object.values(revenueBreakdownData),
-                        type: 'pie',
-                        hole: 0.3
-                    }}
-                ], {{
-                    title: 'Breakdown of Annual Revenues',
-                    annotations: [{{text: ' ', x: 0.5, y: 0.5, font_size: 20, showarrow: false}}]
-                }}, 
-                {{responsive: true}});
             }}
 
             function resetDefaults() {{
@@ -525,3 +505,4 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
         file.write(html_content)
 
     print("HTML file generated:" + filename + ".html")
+
