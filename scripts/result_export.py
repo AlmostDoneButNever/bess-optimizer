@@ -417,7 +417,7 @@ def generate_html(filename, BESS_icost, BESS_ecost, BESS_pcost, cap_energy, cap_
                 ], {{
                     title: 'Energy Prices Over Time',
                     xaxis: {{title: 'Time'}},
-                    yaxis: {{title: 'Price ($)'}},
+                    yaxis: {{title: 'Price ($/MWh)'}},
                     legend: {{ orientation: "h", y: 1.2 }}
                 }}, 
                 {{responsive: true}});
