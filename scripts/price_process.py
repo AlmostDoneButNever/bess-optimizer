@@ -58,14 +58,14 @@ def price_process(dir_path, prim_category, cons_category):
         data[folder_name] = concatenated_df
 
 
-    energy_price_df = data['energy'][['DATE', 'PERIOD', 'USEP ($/MWh)']]
-    energy_price_df.columns = ['date', 'period', 'arb_energy_price']
+    energy_price_df = data['energy'][['DATE', 'PERIOD', 'USEP ($/MWh)', 'LCP ($/MWh)']]
+    energy_price_df.columns = ['date', 'period', 'arb_energy_price', 'dr_price']
 
     # Ensure we are working with the original dataframe
     energy_price = energy_price_df.copy()
     energy_price.loc[:, "timestep"] = energy_price["period"].map(period_to_time)
     energy_price.loc[:, "Time"] = energy_price["date"] + " " + energy_price["timestep"]
-    energy_price = energy_price[['Time', 'arb_energy_price']].set_index(['Time'])
+    energy_price = energy_price[['Time', 'arb_energy_price', 'dr_price']].set_index(['Time'])
 
     regulation_price = data['regulation'][['DATE', 'PERIOD', 'PRICE ($/MWh)']]
     regulation_price.columns = ['date', 'period', 'reg_up_price']
