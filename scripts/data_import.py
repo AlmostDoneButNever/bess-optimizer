@@ -43,7 +43,7 @@ def data_import(path):
     basis['annual_time_period'] = data['basis'].value.loc['annual_time_period']
     basis['model_time_period'] = data['basis'].value.loc['model_time_period']
     basis['dt'] = data['basis'].value.loc['dt']
-    basis['wacc'] = data['basis'].value.loc['wacc']
+    basis['wacc'] = data['basis'].value.loc['wacc']/100
 
     service['arb'] = data['basis'].value.loc['service_arb']
     service['reg'] = data['basis'].value.loc['service_reg']
@@ -70,7 +70,9 @@ def data_import(path):
     bess['s_eff'] = data['bess'].value.loc['eff_storage']/100
     bess['initial_soc'] = data['bess'].value.loc['initial_charge']/100
     bess['max_soc'] = data['bess'].value.loc['max_soc']/100
-    bess['min_soc'] = data['bess'].value.loc['max_dod']/100
+    bess['min_soc'] = 1 - data['bess'].value.loc['max_dod']/100
+    bess['cycle_life'] = int(data['bess'].value.loc['cycle_life'])
+    bess['calendar_life'] = int(data['bess'].value.loc['calendar_life'])
     bess['daily_cycle'] = data['bess'].value.loc['daily_cycle']
     bess['fixed_capex'] = data['bess'].value.loc['bess_fixed_capex']
     bess['energy_capex'] = data['bess'].value.loc['bess_energy_capex']
