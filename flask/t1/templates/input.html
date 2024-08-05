@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Excel File</title>
+</head>
+<body>
+    <h1>Upload Excel File</h1>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="Upload" onclick="showProgress()">
+    </form>
+    <div id="progress" style="display:none;">
+        <p>Solving... Please wait.</p>
+    </div>
+    <script>
+        function showProgress() {
+            document.getElementById('progress').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

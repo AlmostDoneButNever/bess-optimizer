@@ -54,6 +54,7 @@ def data_import(path):
     service['il'] = data['basis'].value.loc['service_il']
     service['reg_symmetric'] = data['basis'].value.loc['reg_symmetric']
     service['reg_activate'] = data['basis'].value.loc['reg_activate']
+    service['load'] = data['basis'].value.loc['service_load']
 
     revenue_change['arb'] = data['basis'].value.loc['dev_rev_arb']
     revenue_change['reg'] = data['basis'].value.loc['dev_rev_reg']

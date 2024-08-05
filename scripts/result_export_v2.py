@@ -1,9 +1,11 @@
-def generate_html(filename, bess, price_data, result_data, revenue_data, discount_rate):
-    # Convert revenue_data to a dictionary for JavaScript
-    revenue_data_dict = revenue_data.to_dict()
+def generate_html(filename, bess, price_data, result_data, revenue_data, discount_rate, btm_service):
+    # Convert data to JSON format
+    revenue_data_json = revenue_data.to_json(orient='records', date_format='iso')
+    price_data_json = price_data.reset_index().to_json(orient='records', date_format='iso')
+    result_data_json = result_data.to_json(orient='records', date_format='iso')
 
     # Calculate the annual revenue by summing all items in the revenue_data series
-    annual_revenue = revenue_data.sum()
+    annual_revenue = bess['revenue']
 
     # Generate the HTML content with embedded JavaScript
     html_content = f"""
@@ -14,6 +16,10 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Financial Calculations with Plotly</title>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
         <style>
             body {{
                 font-family: Arial, sans-serif;
@@ -108,6 +114,14 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 text-align: center;
                 font-size: 14px;
             }}
+            .timepicker-container {{
+                margin: 20px 0;
+                text-align: center;
+            }}
+            .custom-date-range {{
+                display: inline-block;
+                margin: 10px 0;
+            }}
         </style>
     </head>
     <body>
@@ -119,10 +133,27 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
         <div id="bessOptimizationResult" class="content active">
             <h1>Optimization Result for BESS Operation</h1>
             <p>Optimization results for Battery Energy Storage System (BESS) operation will be displayed here, including price data, charging and discharging schedules, and state of charge over time.</p>
+            <div class="timepicker-container">
+                <div class="custom-date-range">
+                    <input type="text" id="timepicker_custom" />
+                </div>
+                <div class="quick-select">
+                    <label for="startDate">Start Date:</label>
+                    <input type="date" id="startDate" />
+                    <button onclick="selectQuickRange('1 Day')">1 Day</button>
+                    <button onclick="selectQuickRange('7 Days')">7 Days</button>
+                    <button onclick="selectQuickRange('1 Month')">1 Month</button>
+                </div>
+                <div>
+                    <button onclick="resetDefaults()">Reset</button>
+                </div>
+            </div>
             <div class="chart-container" id="prices_chart"></div>
             <div class="chart-container" id="revenue_breakdown_chart"></div>
-            <div class="chart-container" id="charge_discharge_chart"></div>
             <div class="chart-container" id="soc_chart"></div>
+            <div class="chart-container" id="charge_discharge_chart"></div>
+            <div class="chart-container" id="operation_schedule_chart"></div>
+            <div class="chart-container" id="btm_services_chart" style="display: none;"></div>
         </div>
 
         <div id="economicAnalysis" class="content">
@@ -206,6 +237,42 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
         </div>
 
         <script>
+            var resultData = {result_data_json};
+            var priceData = {price_data_json};
+            var revenueData = {revenue_data_json};
+
+            var startDate = new Date(resultData[0].time);
+            var endDate = new Date(resultData[resultData.length - 1].time);
+
+            $(function() {{
+                $('#timepicker_custom').daterangepicker({{
+                    startDate: moment(startDate),
+                    endDate: moment(endDate),
+                    minDate: moment(startDate),
+                    maxDate: moment(endDate),
+                    locale: {{
+                        format: 'YYYY-MM-DD'
+                    }}
+                }}, function(start, end) {{
+                    filterDataByDateRange(start, end);
+                }});
+            }});
+
+            function selectQuickRange(range) {{
+                var start = moment(document.getElementById('startDate').value);
+                var end;
+
+                if (range === '1 Day') {{
+                    end = start.clone().add(1, 'days');
+                }} else if (range === '7 Days') {{
+                    end = start.clone().add(7, 'days');
+                }} else if (range === '1 Month') {{
+                    end = start.clone().add(1, 'months');
+                }}
+
+                filterDataByDateRange(start, end);
+            }}
+
             const defaultValues = {{
                 fixed_capex: {bess['fixed_capex']},
                 energy_capex: {bess['energy_capex']},
@@ -222,10 +289,6 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 projectDuration: {bess['calendar_life']}
             }};
 
-            var priceData = {price_data};
-            var resultData = {result_data};
-            var revenueBreakdownData = {revenue_data_dict};
-
             priceData.forEach(function(d) {{
                 d.time = new Date(d.time);
             }});
@@ -233,6 +296,67 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             resultData.forEach(function(d) {{
                 d.time = new Date(d.time);
             }});
+
+            revenueData.forEach(function(d) {{
+                d.time = new Date(d.time);
+            }});
+
+            function filterDataByDateRange(start, end) {{
+                var filteredPriceData = priceData.filter(function(d) {{
+                    return d.time >= start.toDate() && d.time <= end.toDate();
+                }});
+
+                var filteredResultData = resultData.filter(function(d) {{
+                    return d.time >= start.toDate() && d.time <= end.toDate();
+                }});
+
+                var filteredRevenueData = revenueData.filter(function(d) {{
+                    return d.time >= start.toDate() && d.time <= end.toDate();
+                }});
+
+                updateRevenueBreakdownChart(filteredRevenueData);
+                renderCharts(filteredPriceData, filteredResultData);
+            }}
+
+            function updateRevenueBreakdownChart(filteredRevenueData) {{
+                var revenueSums = {{
+                    "Arbitrage": 0,
+                    "Frequency Regulation": 0,
+                    "Primary Reserve": 0,
+                    "Contingency Reserve": 0,
+                    "Demand Response": 0,
+                    "Interruptible Load": 0,
+                    "Demand-side Energy Savings": 0
+                }};
+
+                filteredRevenueData.forEach(function(d) {{
+                    revenueSums["Arbitrage"] += d["Arbitrage"];
+                    revenueSums["Frequency Regulation"] += d["Frequency Regulation"];
+                    revenueSums["Primary Reserve"] += d["Primary Reserve"];
+                    revenueSums["Contingency Reserve"] += d["Contingency Reserve"];
+                    revenueSums["Demand Response"] += d["Demand Response"];
+                    revenueSums["Interruptible Load"] += d["Interruptible Load"];
+                    revenueSums["Demand-side Energy Savings"] += d["Demand-side Energy Savings"];
+                }});
+
+                Plotly.newPlot('revenue_breakdown_chart', [
+                    {{
+                        x: Object.values(revenueSums),
+                        y: Object.keys(revenueSums),
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: {{
+                            color: '#ff7f0e'
+                        }}
+                    }}
+                ], {{
+                    title: 'Breakdown of Revenues',
+                    xaxis: {{title: 'Revenue ($)'}},
+                    yaxis: {{title: 'Revenue Sources', automargin: true}},
+                    margin: {{ t: 50, l: 200, r: 0, b: 50 }}
+                }}, 
+                {{responsive: true}});
+            }}
 
             function formatCurrency(value) {{
                 return value.toLocaleString(undefined, {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
@@ -260,9 +384,9 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 updateChart();
             }}
 
-            function calculatePaybackPeriod(cumulativeCashFlow) {{
-                for (let i = 0; i < cumulativeCashFlow.length; i++) {{
-                    if (cumulativeCashFlow[i] >= 0) {{
+            function calculatePaybackPeriod(cumulativeDiscountedCashFlow) {{
+                for (let i = 0; i < cumulativeDiscountedCashFlow.length; i++) {{
+                    if (cumulativeDiscountedCashFlow[i] >= 0) {{
                         return i;
                     }}
                 }}
@@ -301,7 +425,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 let bcr = totalPvInflows / totalPvOutflows;
                 let roi = ((totalPvInflows - totalPvOutflows) / totalPvOutflows) * 100;
                 let irr = calculateIRR(netCashFlow) * 100;
-                let paybackPeriod = calculatePaybackPeriod(cumulativeNetCashFlow);
+                let paybackPeriod = calculatePaybackPeriod(cumulativeDiscountedCashFlow);
 
                 document.getElementById('npvValue').innerText = formatCurrency(npv);
                 document.getElementById('bcrValue').innerText = bcr.toFixed(2);
@@ -333,14 +457,20 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     x: metrics.periods,
                     y: metrics.cashInflows,
                     name: 'Annual Revenue',
-                    type: 'bar'
+                    type: 'bar',
+                    marker: {{
+                        color: '#1f77b4'
+                    }}
                 }};
 
                 let cashOutflowsTrace = {{
                     x: metrics.periods,
                     y: metrics.cashOutflows,
                     name: 'Annual Cost',
-                    type: 'bar'
+                    type: 'bar',
+                    marker: {{
+                        color: '#ff7f0e'
+                    }}
                 }};
 
                 let netCashFlowTrace = {{
@@ -348,7 +478,13 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     y: metrics.netCashFlow,
                     name: 'Net Cash Flow',
                     type: 'scatter',
-                    mode: 'lines+markers'
+                    mode: 'lines+markers',
+                    marker: {{
+                        color: '#2ca02c'
+                    }},
+                    line: {{
+                        color: '#2ca02c'
+                    }}
                 }};
 
                 let cumulativeNetCashFlowTrace = {{
@@ -356,7 +492,13 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     y: metrics.cumulativeNetCashFlow,
                     name: 'Undiscounted Cumulative Cash Flow',
                     type: 'scatter',
-                    mode: 'lines+markers'
+                    mode: 'lines+markers',
+                    marker: {{
+                        color: '#d62728'
+                    }},
+                    line: {{
+                        color: '#d62728'
+                    }}
                 }};
 
                 let cumulativeDiscountedCashFlowTrace = {{
@@ -364,7 +506,13 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     y: metrics.cumulativeDiscountedCashFlow,
                     name: 'Discounted Cumulative Cash Flow',
                     type: 'scatter',
-                    mode: 'lines+markers'
+                    mode: 'lines+markers',
+                    marker: {{
+                        color: '#9467bd'
+                    }},
+                    line: {{
+                        color: '#9467bd'
+                    }}
                 }};
 
                 let netCashFlowData = [cashInflowsTrace, cashOutflowsTrace, netCashFlowTrace];
@@ -375,14 +523,14 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     xaxis: {{ title: 'Period' }},
                     yaxis: {{ title: 'Amount ($)' }},
                     barmode: 'group',
-                    legend: {{ orientation: "h", y: 1.2 }}
+                    legend: {{ orientation: "h", y: 1.1 }}
                 }};
 
                 let cumulativeCashFlowLayout = {{
                     title: 'Cumulative Cash Flows',
                     xaxis: {{ title: 'Period' }},
                     yaxis: {{ title: 'Amount ($)' }},
-                    legend: {{ orientation: "h", y: 1.2 }}
+                    legend: {{ orientation: "h", y: 1.1 }}
                 }};
 
                 Plotly.newPlot('netCashFlowChart', netCashFlowData, netCashFlowLayout, {{responsive: true}});
@@ -398,105 +546,181 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 window.dispatchEvent(new Event('resize')); // Trigger resize to adjust Plotly charts
             }}
 
-            function renderCharts() {{
+            function renderCharts(filteredPriceData, filteredResultData) {{
                 // Prices Chart
                 Plotly.newPlot('prices_chart', [
                     {{
-                        x: priceData.map(item => item.time),
-                        y: priceData.map(item => item.arb_energy_price),
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.arb_energy_price),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Energy Price'
+                        name: 'Energy (Wholesale)',
+                        line: {{color: '#1f77b4'}}
                     }},
                     {{
-                        x: priceData.map(item => item.time),
-                        y: priceData.map(item => item.reg_up_price),
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.reg_up_price),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Regulation Up Price'
+                        name: 'Regulation Up',
+                        line: {{color: '#ff7f0e'}}
                     }},
                     {{
-                        x: priceData.map(item => item.time),
-                        y: priceData.map(item => item.reg_down_price),
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.reg_down_price),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Regulation Down Price'
+                        name: 'Regulation Down',
+                        line: {{color: '#2ca02c'}}
                     }},
                     {{
-                        x: priceData.map(item => item.time),
-                        y: priceData.map(item => item.pres_capacity_price),
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.pres_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Primary Reserve Price'
+                        name: 'Primary Reserve',
+                        line: {{color: '#d62728'}}
                     }},
                     {{
-                        x: priceData.map(item => item.time),
-                        y: priceData.map(item => item.cres_capacity_price),
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.cres_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Contingency Reserve Price'
+                        name: 'Contingency Reserve',
+                        line: {{color: '#9467bd'}}
+                    }},
+                    {{
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.dr_capacity_price),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Demand Response',
+                        line: {{color: '#8c564b'}}
+                    }},
+                    {{
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.il_capacity_price),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Interruptible Load',
+                        line: {{color: '#e377c2'}}
+                    }},
+                    {{
+                        x: filteredPriceData.map(item => item.time),
+                        y: filteredPriceData.map(item => item.ec_energy_price),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Consumer-side Energy',
+                        line: {{color: '#7f7f7f'}}
                     }}
                 ], {{
                     title: 'Energy Prices Over Time',
                     xaxis: {{title: 'Time'}},
                     yaxis: {{title: 'Price ($/MWh)'}},
-                    legend: {{ orientation: "h", y: 1.2 }}
+                    legend: {{ orientation: "h", y: 1.1 }}
                 }}, 
                 {{responsive: true}});
 
                 // Charge Discharge Chart
                 Plotly.newPlot('charge_discharge_chart', [
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.net_discharge),
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.arb_discharge),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Net Power'
+                        name: 'Arbitrage Discharge',
+                        line: {{color: '#1f77b4'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.reg_up),
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => -item.arb_charge),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Regulation Up Capacity'
+                        name: 'Arbitrage Charge',
+                        line: {{color: '#17becf'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.reg_down),
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.reg_up),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Regulation Down Capacity'
+                        name: 'Regulation Up',
+                        line: {{color: '#ff7f0e'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.pres),
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => -item.reg_down),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Primary Reserve Capacity'
+                        name: 'Regulation Down',
+                        line: {{color: '#2ca02c'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.cres),
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.pres),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'Contingency Reserve Capacity'
-                    }}
+                        name: 'Primary Reserve',
+                        line: {{color: '#2ca02c'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.cres),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Contingency Reserve',
+                        line: {{color: '#d62728'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.dr),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Demand Response',
+                        line: {{color: '#8c564b'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.il),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Interruptible Load',
+                        line: {{color: '#e377c2'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.storage_to_load),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Storage to Load',
+                        line: {{color: '#7f7f7f'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => -item.grid_to_storage),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Grid to Storage',
+                        line: {{color: '#bcbd22'}}
+                    }},
                 ], {{
                     title: 'Operation Schedule',
                     xaxis: {{title: 'Time'}},
                     yaxis: {{title: 'Power (MW)'}},
-                    legend: {{ orientation: "h", y: 1.2 }}
+                    legend: {{ orientation: "h", y: 1.1 }}
                 }}, 
                 {{responsive: true}});
 
                 // SOC Chart
                 Plotly.newPlot('soc_chart', [
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.soc_percent * 100),
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.soc_percent * 100),
                         type: 'scatter',
                         mode: 'lines',
-                        name: 'State of Charge'
+                        fill: 'tozeroy',
+                        name: 'State of Charge',
+                        line: {{color: '#1f77b4'}}
                     }}
                 ], {{
                     title: 'State of Charge Over Time',
@@ -506,21 +730,140 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 }}, 
                 {{responsive: true}});
 
-                // Revenue Breakdown Chart
-                Plotly.newPlot('revenue_breakdown_chart', [
+                // Operation Schedule Stacked Bar Chart
+                Plotly.newPlot('operation_schedule_chart', [
                     {{
-                        x: Object.values(revenueBreakdownData),
-                        y: Object.keys(revenueBreakdownData),
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.arb_discharge),
+                        name: 'Arbitrage Discharge',
                         type: 'bar',
-                        orientation: 'h'
+                        marker: {{color: '#1f77b4'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => -item.arb_charge),
+                        name: 'Arbitrage Charge',
+                        type: 'bar',
+                        marker: {{color: '#17becf'}},
+                        offsetgroup: 'negative'
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.reg_up),
+                        name: 'Regulation Up',
+                        type: 'bar',
+                        marker: {{color: '#ff7f0e'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => -item.reg_down),
+                        name: 'Regulation Down',
+                        type: 'bar',
+                        marker: {{color: '#2ca02c'}},
+                        offsetgroup: 'negative'
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.pres),
+                        name: 'Primary Reserve',
+                        type: 'bar',
+                        marker: {{color: '#2ca02c'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.cres),
+                        name: 'Contingency Reserve',
+                        type: 'bar',
+                        marker: {{color: '#d62728'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.dr),
+                        name: 'Demand Response',
+                        type: 'bar',
+                        marker: {{color: '#8c564b'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.il),
+                        name: 'Interruptible Load',
+                        type: 'bar',
+                        marker: {{color: '#e377c2'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => item.storage_to_load),
+                        name: 'Storage to Load',
+                        type: 'bar',
+                        marker: {{color: '#7f7f7f'}}
+                    }},
+                    {{
+                        x: filteredResultData.map(item => item.time),
+                        y: filteredResultData.map(item => -item.grid_to_storage),
+                        name: 'Grid to Storage',
+                        type: 'bar',
+                        marker: {{color: '#bcbd22'}},
+                        offsetgroup: 'negative'
                     }}
                 ], {{
-                    title: 'Breakdown of Annual Revenues',
-                    xaxis: {{title: 'Revenue ($)'}},
-                    yaxis: {{title: 'Revenue Sources'}},
-                    legend: {{ orientation: "h", y: 1.2 }}
+                    title: 'Operation Schedule - Stacked Bar',
+                    barmode: 'relative',
+                    xaxis: {{title: 'Time'}},
+                    yaxis: {{title: 'Power (MW)'}},
+                    legend: {{ orientation: "h", y: 1.1 }}
                 }}, 
                 {{responsive: true}});
+
+                // BTM Services Chart
+                if ({btm_service}) {{
+                    document.getElementById('btm_services_chart').style.display = 'block';
+                    Plotly.newPlot('btm_services_chart', [
+                        {{
+                            x: filteredResultData.map(item => item.time),
+                            y: filteredResultData.map(item => item.grid_purchase),
+                            type: 'scatter',
+                            mode: 'lines',
+                            name: 'Grid Purchase',
+                            line: {{color: '#1f77b4'}}
+                        }},
+                        {{
+                            x: filteredResultData.map(item => item.time),
+                            y: filteredResultData.map(item => item.load),
+                            type: 'scatter',
+                            mode: 'lines',
+                            name: 'Load',
+                            line: {{color: '#ff7f0e'}}
+                        }},
+                        {{
+                            x: filteredResultData.map(item => item.time),
+                            y: filteredResultData.map(item => item.grid_to_storage),
+                            name: 'Grid to Storage',
+                            type: 'bar',
+                            marker: {{color: '#2ca02c'}}
+                        }},
+                        {{
+                            x: filteredResultData.map(item => item.time),
+                            y: filteredResultData.map(item => item.grid_to_load),
+                            name: 'Grid to Load',
+                            type: 'bar',
+                            marker: {{color: '#d62728'}}
+                        }},
+                        {{
+                            x: filteredResultData.map(item => item.time),
+                            y: filteredResultData.map(item => item.storage_to_load),
+                            name: 'Storage to Load',
+                            type: 'bar',
+                            marker: {{color: '#9467bd'}}
+                        }}
+                    ], {{
+                        title: 'BTM Services',
+                        barmode: 'stack',
+                        xaxis: {{title: 'Time'}},
+                        yaxis: {{title: 'Power (MW)'}},
+                        legend: {{ orientation: "h", y: 1.1 }}
+                    }}, 
+                    {{responsive: true}});
+                }}
             }}
 
             function resetDefaults() {{
@@ -537,10 +880,13 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 document.getElementById('cap_power').innerText = defaultValues.cap_power;
                 document.getElementById('annualRevenue').innerText = formatCurrency(defaultValues.annualRevenue);
                 updateInitialCost();
+                $('#timepicker_custom').data('daterangepicker').setStartDate(moment(startDate));
+                $('#timepicker_custom').data('daterangepicker').setEndDate(moment(endDate));
+                document.getElementById('startDate').value = moment(startDate).format('YYYY-MM-DD');
+                filterDataByDateRange(moment(startDate), moment(endDate));
             }}
 
             resetDefaults(); // Initialize with default values
-            renderCharts(); // Render charts initially
         </script>
     </body>
     </html>
