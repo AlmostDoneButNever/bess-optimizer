@@ -119,7 +119,11 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 text-align: center;
             }}
             .custom-date-range {{
-                display: inline-block;
+                display: none;
+                margin: 10px 0;
+            }}
+            .quick-select {{
+                display: none;
                 margin: 10px 0;
             }}
         </style>
@@ -134,15 +138,24 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             <h1>Optimization Result for BESS Operation</h1>
             <p>Optimization results for Battery Energy Storage System (BESS) operation will be displayed here, including price data, charging and discharging schedules, and state of charge over time.</p>
             <div class="timepicker-container">
-                <div class="custom-date-range">
-                    <input type="text" id="timepicker_custom" />
-                </div>
+                <p>Please select a date range option:</p>
+                <label>
+                    <input type="radio" name="dateRangeOption" value="quick" onchange="toggleDateRange('quick')" checked>
+                    Quick Select (1 Day, 7 Days, 1 Month)
+                </label>
+                <label>
+                    <input type="radio" name="dateRangeOption" value="custom" onchange="toggleDateRange('custom')">
+                    Custom Range
+                </label>
                 <div class="quick-select">
                     <label for="startDate">Start Date:</label>
-                    <input type="date" id="startDate" />
+                    <input type="date" id="startDate" min="{result_data['time'].min()[:10]}" max="{result_data['time'].max()[:10]}" value="{result_data['time'].min()[:10]}" />
                     <button onclick="selectQuickRange('1 Day')">1 Day</button>
                     <button onclick="selectQuickRange('7 Days')">7 Days</button>
                     <button onclick="selectQuickRange('1 Month')">1 Month</button>
+                </div>
+                <div class="custom-date-range">
+                    <input type="text" id="timepicker_custom" />
                 </div>
                 <div>
                     <button onclick="resetDefaults()">Reset</button>
@@ -257,6 +270,16 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     filterDataByDateRange(start, end);
                 }});
             }});
+
+            function toggleDateRange(option) {{
+                if (option === 'quick') {{
+                    document.querySelector('.quick-select').style.display = 'block';
+                    document.querySelector('.custom-date-range').style.display = 'none';
+                }} else if (option === 'custom') {{
+                    document.querySelector('.quick-select').style.display = 'none';
+                    document.querySelector('.custom-date-range').style.display = 'block';
+                }}
+            }}
 
             function selectQuickRange(range) {{
                 var start = moment(document.getElementById('startDate').value);
@@ -884,6 +907,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 $('#timepicker_custom').data('daterangepicker').setEndDate(moment(endDate));
                 document.getElementById('startDate').value = moment(startDate).format('YYYY-MM-DD');
                 filterDataByDateRange(moment(startDate), moment(endDate));
+                toggleDateRange('quick');
             }}
 
             resetDefaults(); // Initialize with default values
