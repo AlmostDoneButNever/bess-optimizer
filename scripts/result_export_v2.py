@@ -126,6 +126,10 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 display: none;
                 margin: 10px 0;
             }}
+            .selected {{
+                background-color: #007bff;
+                color: white;
+            }}
         </style>
     </head>
     <body>
@@ -138,27 +142,24 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             <h1>Optimization Result for BESS Operation</h1>
             <p>Optimization results for Battery Energy Storage System (BESS) operation will be displayed here, including price data, charging and discharging schedules, and state of charge over time.</p>
             <div class="timepicker-container">
-                <p>Please select a date range option:</p>
-                <label>
-                    <input type="radio" name="dateRangeOption" value="quick" onchange="toggleDateRange('quick')" checked>
-                    Quick Select (1 Day, 7 Days, 1 Month)
-                </label>
-                <label>
-                    <input type="radio" name="dateRangeOption" value="custom" onchange="toggleDateRange('custom')">
-                    Custom Range
-                </label>
+                <div>
+                    <p>Select a date range option:</p>
+                    <label><input type="radio" name="dateRangeOption" value="quick" checked onclick="toggleDateRange('quick')"> Start Date and Duration</label>
+                    <label><input type="radio" name="dateRangeOption" value="custom" onclick="toggleDateRange('custom')"> Custom Time Range</label>
+                </div>
                 <div class="quick-select">
                     <label for="startDate">Start Date:</label>
-                    <input type="date" id="startDate" min="{result_data['time'].min()[:10]}" max="{result_data['time'].max()[:10]}" value="{result_data['time'].min()[:10]}" />
+                    <input type="date" id="startDate" min="{result_data['time'].min().strftime('%Y-%m-%d')}" max="{result_data['time'].max().strftime('%Y-%m-%d')}"/>
                     <button onclick="selectQuickRange('1 Day')">1 Day</button>
                     <button onclick="selectQuickRange('7 Days')">7 Days</button>
                     <button onclick="selectQuickRange('1 Month')">1 Month</button>
+                    <button onclick="selectQuickRange('All')">All</button>
                 </div>
                 <div class="custom-date-range">
                     <input type="text" id="timepicker_custom" />
                 </div>
                 <div>
-                    <button onclick="resetDefaults()">Reset</button>
+                    <button onclick="resetOptimizationResultDefaults()">Reset</button>
                 </div>
             </div>
             <div class="chart-container" id="prices_chart"></div>
@@ -234,7 +235,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 <input type="number" id="costChange" name="costChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
             </div>
             <div class="input-group">
-                <button onclick="resetDefaults()">Reset to Default Values</button>
+                <button onclick="resetEconomicAnalysisDefaults()">Reset to Default Values</button>
             </div>
 
             <div class="metrics">
@@ -275,10 +276,11 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 if (option === 'quick') {{
                     document.querySelector('.quick-select').style.display = 'block';
                     document.querySelector('.custom-date-range').style.display = 'none';
-                }} else if (option === 'custom') {{
+                }} else {{
                     document.querySelector('.quick-select').style.display = 'none';
                     document.querySelector('.custom-date-range').style.display = 'block';
                 }}
+                highlightSelectedRange('quick', option);
             }}
 
             function selectQuickRange(range) {{
@@ -291,12 +293,31 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     end = start.clone().add(7, 'days');
                 }} else if (range === '1 Month') {{
                     end = start.clone().add(1, 'months');
+                }} else if (range === 'All') {{
+                    start = moment(startDate);
+                    end = moment(endDate);
                 }}
 
+                highlightSelectedRange('quick', range);
                 filterDataByDateRange(start, end);
             }}
 
-            const defaultValues = {{
+            function highlightSelectedRange(type, range) {{
+                var buttons = document.querySelectorAll('.quick-select button');
+                buttons.forEach(function(button) {{
+                    button.classList.remove('selected');
+                }});
+                if (type === 'quick') {{
+                    document.querySelector(`.quick-select button[onclick="selectQuickRange('{range}')"]`).classList.add('selected');
+                }}
+            }}
+
+            const defaultValuesOptimization = {{
+                startDate: startDate,
+                endDate: endDate
+            }};
+
+            const defaultValuesEconomic = {{
                 fixed_capex: {bess['fixed_capex']},
                 energy_capex: {bess['energy_capex']},
                 power_capex: {bess['power_capex']},
@@ -398,8 +419,8 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
 
             function updateAnnualCost() {{
                 let fixedOpex = parseFloat(document.getElementById('fixedOpex').value);
-                let energyOpex = parseFloat(document.getElementById('energyOpex').value);
-                let powerOpex = parseFloat(document.getElementById('powerOpex').value);
+                let energyOpex = parseFloat(document.getElementById('energyOpex').value) * 1000;
+                let powerOpex = parseFloat(document.getElementById('powerOpex').value) * 1000;
                 let cap_energy = parseFloat(document.getElementById('cap_energy').innerText);
                 let cap_power = parseFloat(document.getElementById('cap_power').innerText);
                 let annualCost = fixedOpex + (energyOpex * cap_energy) + (powerOpex * cap_power);
@@ -432,9 +453,9 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             }}
 
             function calculateFinancialMetrics(discountRate, initialCost, annualCost, annualRevenue, revenueChange, costChange) {{
-                let periods = Array.from({{ length: defaultValues.projectDuration + 1 }}, (_, i) => i);
-                let cashInflows = [0].concat(Array(defaultValues.projectDuration).fill(annualRevenue).map((rev, i) => rev * Math.pow(1 + revenueChange / 100, i)));
-                let cashOutflows = [initialCost].concat(Array(defaultValues.projectDuration).fill(annualCost).map((cost, i) => cost * Math.pow(1 + costChange / 100, i)));
+                let periods = Array.from({{ length: defaultValuesEconomic.projectDuration + 1 }}, (_, i) => i);
+                let cashInflows = [0].concat(Array(defaultValuesEconomic.projectDuration).fill(annualRevenue).map((rev, i) => rev * Math.pow(1 + revenueChange / 100, i)));
+                let cashOutflows = [initialCost].concat(Array(defaultValuesEconomic.projectDuration).fill(annualCost).map((cost, i) => cost * Math.pow(1 + costChange / 100, i)));
 
                 let netCashFlow = cashInflows.map((inflow, i) => inflow - cashOutflows[i]);
                 let discountedNetCashFlow = netCashFlow.map((flow, i) => flow / Math.pow(1 + discountRate, periods[i]));
@@ -889,28 +910,35 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 }}
             }}
 
-            function resetDefaults() {{
-                document.getElementById('fixed_capex').value = defaultValues.fixed_capex;
-                document.getElementById('energy_capex').value = defaultValues.energy_capex;
-                document.getElementById('power_capex').value = defaultValues.power_capex;
-                document.getElementById('fixedOpex').value = defaultValues.fixedOpex;
-                document.getElementById('energyOpex').value = defaultValues.energyOpex;
-                document.getElementById('powerOpex').value = defaultValues.powerOpex;
-                document.getElementById('discountRate').value = defaultValues.discountRate * 100;
-                document.getElementById('revenueChange').value = defaultValues.revenueChange;
-                document.getElementById('costChange').value = defaultValues.costChange;
-                document.getElementById('cap_energy').innerText = defaultValues.cap_energy;
-                document.getElementById('cap_power').innerText = defaultValues.cap_power;
-                document.getElementById('annualRevenue').innerText = formatCurrency(defaultValues.annualRevenue);
-                updateInitialCost();
-                $('#timepicker_custom').data('daterangepicker').setStartDate(moment(startDate));
-                $('#timepicker_custom').data('daterangepicker').setEndDate(moment(endDate));
-                document.getElementById('startDate').value = moment(startDate).format('YYYY-MM-DD');
-                filterDataByDateRange(moment(startDate), moment(endDate));
+            function resetOptimizationResultDefaults() {{
+                $('#timepicker_custom').data('daterangepicker').setStartDate(moment(defaultValuesOptimization.startDate));
+                $('#timepicker_custom').data('daterangepicker').setEndDate(moment(defaultValuesOptimization.endDate));
+                document.getElementById('startDate').value = moment(defaultValuesOptimization.startDate).format('YYYY-MM-DD');
+                filterDataByDateRange(moment(defaultValuesOptimization.startDate), moment(defaultValuesOptimization.endDate));
+                document.querySelector('input[name="dateRangeOption"][value="quick"]').checked = true;
                 toggleDateRange('quick');
+                highlightSelectedRange('quick', 'All');
             }}
 
-            resetDefaults(); // Initialize with default values
+            function resetEconomicAnalysisDefaults() {{
+                document.getElementById('fixed_capex').value = defaultValuesEconomic.fixed_capex;
+                document.getElementById('energy_capex').value = defaultValuesEconomic.energy_capex;
+                document.getElementById('power_capex').value = defaultValuesEconomic.power_capex;
+                document.getElementById('fixedOpex').value = defaultValuesEconomic.fixedOpex;
+                document.getElementById('energyOpex').value = defaultValuesEconomic.energyOpex;
+                document.getElementById('powerOpex').value = defaultValuesEconomic.powerOpex;
+                document.getElementById('discountRate').value = defaultValuesEconomic.discountRate * 100;
+                document.getElementById('revenueChange').value = defaultValuesEconomic.revenueChange;
+                document.getElementById('costChange').value = defaultValuesEconomic.costChange;
+                document.getElementById('cap_energy').innerText = defaultValuesEconomic.cap_energy;
+                document.getElementById('cap_power').innerText = defaultValuesEconomic.cap_power;
+                document.getElementById('annualRevenue').innerText = formatCurrency(defaultValuesEconomic.annualRevenue);
+                updateInitialCost();
+                updateAnnualCost();
+            }}
+
+            resetOptimizationResultDefaults(); // Initialize with default values for Optimization Result
+            resetEconomicAnalysisDefaults(); // Initialize with default values for Economic Analysis
         </script>
     </body>
     </html>
