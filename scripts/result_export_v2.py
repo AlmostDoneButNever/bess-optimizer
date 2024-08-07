@@ -17,9 +17,6 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
         <title>Financial Calculations with Plotly</title>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
         <style>
             body {{
                 font-family: Arial, sans-serif;
@@ -64,37 +61,32 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             .input-group {{
                 margin: 10px 0;
                 display: flex;
-                align-items: center;
-            }}
-            .input-group label {{
-                margin-right: 10px;
-                flex: 1;
+                flex-direction: column;
                 font-size: 14px;
             }}
+            .input-group label {{
+                margin-bottom: 5px;
+            }}
             .input-group input {{
-                flex: 2;
-                padding: 8px;
+                padding: 6px;
                 border: 1px solid #ccc;
                 border-radius: 4px;
                 font-size: 14px;
             }}
             .input-group span {{
-                flex: 2;
-                padding: 8px;
+                padding: 6px;
                 border: 1px solid #ccc;
                 border-radius: 4px;
                 background-color: #f9f9f9;
                 text-align: left;
-                font-size: 14px;
             }}
             .input-group button {{
-                padding: 10px 20px;
+                padding: 6px 12px;
                 background-color: #007bff;
                 color: white;
                 border: none;
                 border-radius: 4px;
                 cursor: pointer;
-                font-size: 14px;
             }}
             .input-group button:hover {{
                 background-color: #0056b3;
@@ -112,25 +104,50 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 border: 1px solid #ccc;
                 border-radius: 4px;
                 text-align: center;
-                font-size: 14px;
             }}
-            .timepicker-container {{
-                margin: 20px 0;
-                text-align: center;
+            .input-container {{
+                display: flex;
+                flex-wrap: wrap;
             }}
-            .custom-date-range {{
-                display: none;
-                margin: 10px 0;
+            .input-container .input-group {{
+                flex: 1 1 calc(50% - 10px);
+                box-sizing: border-box;
+                margin-bottom: 10px;
             }}
-            .quick-select {{
-                display: none;
-                margin: 10px 0;
-            }}
-            .selected {{
-                background-color: #007bff;
-                color: white;
+            .input-container .input-group:nth-child(odd) {{
+                margin-right: 20px;
             }}
         </style>
+        <script>
+            function setInitialStep(input) {{
+                const value = input.defaultValue;
+                if (input.id === 'discountRate' || input.id === 'revenueChange' || input.id === 'costChange') {{
+                    input.step = 1;
+                }} else if (value) {{
+                    const [integerPart, decimalPart] = value.split('.');
+                    if (decimalPart) {{
+                        // If there's a decimal part, the step should be 10^(number of integer digits - 1)
+                        const step = Math.pow(10, integerPart.length - 1);
+                        input.step = step;
+                    }} else {{
+                        // If there's no decimal part, calculate step based on the length of the integer part
+                        const step = Math.pow(10, value.length - 1);
+                        input.step = step;
+                    }}
+                }} else {{
+                    input.step = 1; // default step if input is empty
+                }}
+            }}
+
+            function initializeStepValues() {{
+                const inputs = document.querySelectorAll('.input-group input[type="number"]');
+                inputs.forEach(input => {{
+                    setInitialStep(input);
+                }});
+            }}
+
+            document.addEventListener('DOMContentLoaded', initializeStepValues);
+        </script>
     </head>
     <body>
         <div class="menu">
@@ -141,27 +158,6 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
         <div id="bessOptimizationResult" class="content active">
             <h1>Optimization Result for BESS Operation</h1>
             <p>Optimization results for Battery Energy Storage System (BESS) operation will be displayed here, including price data, charging and discharging schedules, and state of charge over time.</p>
-            <div class="timepicker-container">
-                <div>
-                    <p>Select a date range option:</p>
-                    <label><input type="radio" name="dateRangeOption" value="quick" checked onclick="toggleDateRange('quick')"> Start Date and Duration</label>
-                    <label><input type="radio" name="dateRangeOption" value="custom" onclick="toggleDateRange('custom')"> Custom Time Range</label>
-                </div>
-                <div class="quick-select">
-                    <label for="startDate">Start Date:</label>
-                    <input type="date" id="startDate" min="{result_data['time'].min().strftime('%Y-%m-%d')}" max="{result_data['time'].max().strftime('%Y-%m-%d')}"/>
-                    <button onclick="selectQuickRange('1 Day')">1 Day</button>
-                    <button onclick="selectQuickRange('7 Days')">7 Days</button>
-                    <button onclick="selectQuickRange('1 Month')">1 Month</button>
-                    <button onclick="selectQuickRange('All')">All</button>
-                </div>
-                <div class="custom-date-range">
-                    <input type="text" id="timepicker_custom" />
-                </div>
-                <div>
-                    <button onclick="resetOptimizationResultDefaults()">Reset</button>
-                </div>
-            </div>
             <div class="chart-container" id="prices_chart"></div>
             <div class="chart-container" id="revenue_breakdown_chart"></div>
             <div class="chart-container" id="soc_chart"></div>
@@ -174,68 +170,74 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             <h1>Economic Analysis</h1>
 
             <h2>Capacity Settings</h2>
-            <div class="input-group">
-                <label>Power capacity (MW):</label>
-                <span id="cap_power">{bess['cap_power']}</span>
-            </div>
-            <div class="input-group">
-                <label>Energy capacity (MWh):</label>
-                <span id="cap_energy">{bess['cap_energy']}</span>
+            <div class="input-container">
+                <div class="input-group">
+                    <label>Power capacity (MW):</label>
+                    <span id="cap_power">{bess['cap_power']}</span>
+                </div>
+                <div class="input-group">
+                    <label>Energy capacity (MWh):</label>
+                    <span id="cap_energy">{bess['cap_energy']}</span>
+                </div>
             </div>
 
             <h2>Costing</h2>
-            <div class="input-group">
-                <label for="fixed_capex">Fixed capital cost ($):</label>
-                <input type="number" id="fixed_capex" name="fixed_capex" value="{bess['fixed_capex']}" step="1000" min="0" oninput="updateInitialCost()">
-            </div>
-            <div class="input-group">
-                <label for="energy_capex">Energy-related capital cost ($/kWh):</label>
-                <input type="number" id="energy_capex" name="energy_capex" value="{bess['energy_capex']}" step="1000" min="0" oninput="updateInitialCost()">
-            </div>
-            <div class="input-group">
-                <label for="power_capex">Power-related capital cost ($/kW):</label>
-                <input type="number" id="power_capex" name="power_capex" value="{bess['power_capex']}" step="1000" min="0" oninput="updateInitialCost()">
-            </div>
-            <div class="input-group">
-                <label for="fixedOpex">Fixed O&M cost ($):</label>
-                <input type="number" id="fixedOpex" name="fixedOpex" value="{bess['fixed_opex']}" step="100" min="0" oninput="updateAnnualCost()">
-            </div>
-            <div class="input-group">
-                <label for="energyOpex">Energy-related O&M cost ($/kWh):</label>
-                <input type="number" id="energyOpex" name="energyOpex" value="{bess['energy_opex']}" step="10" min="0" oninput="updateAnnualCost()">
-            </div>
-            <div class="input-group">
-                <label for="powerOpex">Power-related O&M cost ($/kW):</label>
-                <input type="number" id="powerOpex" name="powerOpex" value="{bess['power_opex']}" step="10" min="0" oninput="updateAnnualCost()">
+            <div class="input-container">
+                <div class="input-group">
+                    <label for="fixed_capex">Fixed capital cost ($):</label>
+                    <input type="number" id="fixed_capex" name="fixed_capex" value="{bess['fixed_capex']}" min="0" oninput="updateInitialCost()">
+                </div>
+                <div class="input-group">
+                    <label for="energy_capex">Energy-related capital cost ($/kWh):</label>
+                    <input type="number" id="energy_capex" name="energy_capex" value="{bess['energy_capex']}" min="0" oninput="updateInitialCost()">
+                </div>
+                <div class="input-group">
+                    <label for="power_capex">Power-related capital cost ($/kW):</label>
+                    <input type="number" id="power_capex" name="power_capex" value="{bess['power_capex']}" min="0" oninput="updateInitialCost()">
+                </div>
+                <div class="input-group">
+                    <label for="fixedOpex">Fixed O&M cost ($):</label>
+                    <input type="number" id="fixedOpex" name="fixedOpex" value="{bess['fixed_opex']}" min="0" oninput="updateAnnualCost()">
+                </div>
+                <div class="input-group">
+                    <label for="energyOpex">Energy-related O&M cost ($/kWh):</label>
+                    <input type="number" id="energyOpex" name="energyOpex" value="{bess['energy_opex']}" min="0" oninput="updateAnnualCost()">
+                </div>
+                <div class="input-group">
+                    <label for="powerOpex">Power-related O&M cost ($/kW):</label>
+                    <input type="number" id="powerOpex" name="powerOpex" value="{bess['power_opex']}" min="0" oninput="updateAnnualCost()">
+                </div>
             </div>
 
             <h2>Financial Analysis</h2>
-            <div class="input-group">
-                <label>Initial cost ($):</label>
-                <span id="initialCost">0.00</span>
-            </div>
-            <div class="input-group">
-                <label>Annual cost ($):</label>
-                <span id="annualCost">0.00</span>
-            </div>
-            <div class="input-group">
-                <label>Annual revenue ($):</label>
-                <span id="annualRevenue">{annual_revenue:,.2f}</span>
-            </div>
-            <div class="input-group">
-                <label for="discountRate">Discount rate (%):</label>
-                <input type="number" id="discountRate" name="discountRate" value="{discount_rate * 100}" step="0.01" min="0" max="100" oninput="updateChart()">
-            </div>
-            <div class="input-group">
-                <label for="revenueChange">Annual revenue change (%):</label>
-                <input type="number" id="revenueChange" name="revenueChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
-            </div>
-            <div class="input-group">
-                <label for="costChange">Annual cost change (%):</label>
-                <input type="number" id="costChange" name="costChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
-            </div>
-            <div class="input-group">
-                <button onclick="resetEconomicAnalysisDefaults()">Reset to Default Values</button>
+            <div class="input-container">
+                <div class="input-group">
+                    <label>Initial cost ($):</label>
+                    <span id="initialCost">0.00</span>
+                </div>
+                <div class="input-group">
+                    <label>Annual cost ($):</label>
+                    <span id="annualCost">0.00</span>
+                </div>
+                <div class="input-group">
+                    <label>Annual revenue ($):</label>
+                    <span id="annualRevenue">{annual_revenue:,.2f}</span>
+                </div>
+                <div class="input-group">
+                    <label for="discountRate">Discount rate (%):</label>
+                    <input type="number" id="discountRate" name="discountRate" value="{discount_rate * 100}" step="1" min="0" max="100" oninput="updateChart()">
+                </div>
+                <div class="input-group">
+                    <label for="revenueChange">Annual revenue change (%):</label>
+                    <input type="number" id="revenueChange" name="revenueChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
+                </div>
+                <div class="input-group">
+                    <label for="costChange">Annual cost change (%):</label>
+                    <input type="number" id="costChange" name="costChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
+                </div>
+                <div class="input-group">
+                    <button onclick="resetEconomicAnalysisDefaults()">Reset to Default Values</button>
+                </div>
             </div>
 
             <div class="metrics">
@@ -255,114 +257,15 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             var priceData = {price_data_json};
             var revenueData = {revenue_data_json};
 
-            var startDate = new Date(resultData[0].time);
-            var endDate = new Date(resultData[resultData.length - 1].time);
-
-            $(function() {{
-                $('#timepicker_custom').daterangepicker({{
-                    startDate: moment(startDate),
-                    endDate: moment(endDate),
-                    minDate: moment(startDate),
-                    maxDate: moment(endDate),
-                    locale: {{
-                        format: 'YYYY-MM-DD'
-                    }}
-                }}, function(start, end) {{
-                    filterDataByDateRange(start, end);
-                }});
+            $(document).ready(function() {{
+                renderCharts(priceData, resultData);
+                updateRevenueBreakdownChart(revenueData);
+                updateInitialCost();
+                updateAnnualCost();
+                updateChart();
             }});
 
-            function toggleDateRange(option) {{
-                if (option === 'quick') {{
-                    document.querySelector('.quick-select').style.display = 'block';
-                    document.querySelector('.custom-date-range').style.display = 'none';
-                }} else {{
-                    document.querySelector('.quick-select').style.display = 'none';
-                    document.querySelector('.custom-date-range').style.display = 'block';
-                }}
-                highlightSelectedRange('quick', option);
-            }}
-
-            function selectQuickRange(range) {{
-                var start = moment(document.getElementById('startDate').value);
-                var end;
-
-                if (range === '1 Day') {{
-                    end = start.clone().add(1, 'days');
-                }} else if (range === '7 Days') {{
-                    end = start.clone().add(7, 'days');
-                }} else if (range === '1 Month') {{
-                    end = start.clone().add(1, 'months');
-                }} else if (range === 'All') {{
-                    start = moment(startDate);
-                    end = moment(endDate);
-                }}
-
-                highlightSelectedRange('quick', range);
-                filterDataByDateRange(start, end);
-            }}
-
-            function highlightSelectedRange(type, range) {{
-                var buttons = document.querySelectorAll('.quick-select button');
-                buttons.forEach(function(button) {{
-                    button.classList.remove('selected');
-                }});
-                if (type === 'quick') {{
-                    document.querySelector(`.quick-select button[onclick="selectQuickRange('{range}')"]`).classList.add('selected');
-                }}
-            }}
-
-            const defaultValuesOptimization = {{
-                startDate: startDate,
-                endDate: endDate
-            }};
-
-            const defaultValuesEconomic = {{
-                fixed_capex: {bess['fixed_capex']},
-                energy_capex: {bess['energy_capex']},
-                power_capex: {bess['power_capex']},
-                cap_energy: {bess['cap_energy']},
-                cap_power: {bess['cap_power']},
-                discountRate: {discount_rate},
-                annualRevenue: {annual_revenue},
-                fixedOpex: {bess['fixed_opex']},
-                energyOpex: {bess['energy_opex']},
-                powerOpex: {bess['power_opex']},
-                revenueChange: 0,
-                costChange: 0,
-                projectDuration: {bess['calendar_life']}
-            }};
-
-            priceData.forEach(function(d) {{
-                d.time = new Date(d.time);
-            }});
-
-            resultData.forEach(function(d) {{
-                d.time = new Date(d.time);
-            }});
-
-            revenueData.forEach(function(d) {{
-                d.time = new Date(d.time);
-            }});
-
-            function filterDataByDateRange(start, end) {{
-                var filteredPriceData = priceData.filter(function(d) {{
-                    return d.time >= start.toDate() && d.time <= end.toDate();
-                }});
-
-                var filteredResultData = resultData.filter(function(d) {{
-                    return d.time >= start.toDate() && d.time <= end.toDate();
-                }});
-
-                var filteredRevenueData = revenueData.filter(function(d) {{
-                    return d.time >= start.toDate() && d.time <= end.toDate();
-                }});
-
-                updateRevenueBreakdownChart(filteredRevenueData);
-                renderCharts(filteredPriceData, filteredResultData);
-            }}
-
-            function updateRevenueBreakdownChart(filteredRevenueData) {{
+            function updateRevenueBreakdownChart(revenueData) {{
                 var revenueSums = {{
                     "Arbitrage": 0,
                     "Frequency Regulation": 0,
@@ -373,7 +276,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     "Demand-side Energy Savings": 0
                 }};
 
-                filteredRevenueData.forEach(function(d) {{
+                revenueData.forEach(function(d) {{
                     revenueSums["Arbitrage"] += d["Arbitrage"];
                     revenueSums["Frequency Regulation"] += d["Frequency Regulation"];
                     revenueSums["Primary Reserve"] += d["Primary Reserve"];
@@ -402,10 +305,6 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 {{responsive: true}});
             }}
 
-            function formatCurrency(value) {{
-                return value.toLocaleString(undefined, {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
-            }}
-
             function updateInitialCost() {{
                 let fixed_capex = parseFloat(document.getElementById('fixed_capex').value);
                 let energy_capex = parseFloat(document.getElementById('energy_capex').value) * 1000;
@@ -426,6 +325,10 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 let annualCost = fixedOpex + (energyOpex * cap_energy) + (powerOpex * cap_power);
                 document.getElementById('annualCost').innerText = formatCurrency(annualCost);
                 updateChart();
+            }}
+
+            function formatCurrency(value) {{
+                return value.toLocaleString(undefined, {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
             }}
 
             function calculatePaybackPeriod(cumulativeDiscountedCashFlow) {{
@@ -453,9 +356,9 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             }}
 
             function calculateFinancialMetrics(discountRate, initialCost, annualCost, annualRevenue, revenueChange, costChange) {{
-                let periods = Array.from({{ length: defaultValuesEconomic.projectDuration + 1 }}, (_, i) => i);
-                let cashInflows = [0].concat(Array(defaultValuesEconomic.projectDuration).fill(annualRevenue).map((rev, i) => rev * Math.pow(1 + revenueChange / 100, i)));
-                let cashOutflows = [initialCost].concat(Array(defaultValuesEconomic.projectDuration).fill(annualCost).map((cost, i) => cost * Math.pow(1 + costChange / 100, i)));
+                let periods = Array.from({{ length: {bess['calendar_life']} + 1 }}, (_, i) => i);
+                let cashInflows = [0].concat(Array({bess['calendar_life']}).fill(annualRevenue).map((rev, i) => rev * Math.pow(1 + revenueChange / 100, i)));
+                let cashOutflows = [initialCost].concat(Array({bess['calendar_life']}).fill(annualCost).map((cost, i) => cost * Math.pow(1 + costChange / 100, i)));
 
                 let netCashFlow = cashInflows.map((inflow, i) => inflow - cashOutflows[i]);
                 let discountedNetCashFlow = netCashFlow.map((flow, i) => flow / Math.pow(1 + discountRate, periods[i]));
@@ -471,19 +374,18 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 let irr = calculateIRR(netCashFlow) * 100;
                 let paybackPeriod = calculatePaybackPeriod(cumulativeDiscountedCashFlow);
 
-                document.getElementById('npvValue').innerText = formatCurrency(npv);
-                document.getElementById('bcrValue').innerText = bcr.toFixed(2);
-                document.getElementById('roiValue').innerText = roi.toFixed(2);
-                document.getElementById('irrValue').innerText = irr.toFixed(2);
-                document.getElementById('paybackPeriod').innerText = paybackPeriod;
-
                 return {{
                     periods,
                     cashInflows,
                     cashOutflows,
                     netCashFlow,
                     cumulativeNetCashFlow,
-                    cumulativeDiscountedCashFlow
+                    cumulativeDiscountedCashFlow,
+                    npv,
+                    bcr,
+                    roi,
+                    irr,
+                    paybackPeriod
                 }};
             }}
 
@@ -579,6 +481,27 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
 
                 Plotly.newPlot('netCashFlowChart', netCashFlowData, netCashFlowLayout, {{responsive: true}});
                 Plotly.newPlot('cumulativeCashFlowChart', cumulativeCashFlowData, cumulativeCashFlowLayout, {{responsive: true}});
+
+                document.getElementById('npvValue').innerText = formatCurrency(metrics.npv);
+                document.getElementById('bcrValue').innerText = metrics.bcr.toFixed(2);
+                document.getElementById('roiValue').innerText = metrics.roi.toFixed(2);
+                document.getElementById('irrValue').innerText = metrics.irr.toFixed(2);
+                document.getElementById('paybackPeriod').innerText = metrics.paybackPeriod;
+            }}
+
+            function resetEconomicAnalysisDefaults() {{
+                document.getElementById('fixed_capex').value = {bess['fixed_capex']};
+                document.getElementById('energy_capex').value = {bess['energy_capex']};
+                document.getElementById('power_capex').value = {bess['power_capex']};
+                document.getElementById('fixedOpex').value = {bess['fixed_opex']};
+                document.getElementById('energyOpex').value = {bess['energy_opex']};
+                document.getElementById('powerOpex').value = {bess['power_opex']};
+                document.getElementById('discountRate').value = {discount_rate * 100};
+                document.getElementById('revenueChange').value = 0;
+                document.getElementById('costChange').value = 0;
+                updateInitialCost();
+                updateAnnualCost();
+                updateChart();
             }}
 
             function showSection(sectionId) {{
@@ -590,68 +513,68 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 window.dispatchEvent(new Event('resize')); // Trigger resize to adjust Plotly charts
             }}
 
-            function renderCharts(filteredPriceData, filteredResultData) {{
+            function renderCharts(priceData, resultData) {{
                 // Prices Chart
                 Plotly.newPlot('prices_chart', [
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.arb_energy_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.arb_energy_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Energy (Wholesale)',
                         line: {{color: '#1f77b4'}}
                     }},
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.reg_up_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.reg_up_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Up',
                         line: {{color: '#ff7f0e'}}
                     }},
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.reg_down_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.reg_down_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Down',
                         line: {{color: '#2ca02c'}}
                     }},
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.pres_capacity_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.pres_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Primary Reserve',
                         line: {{color: '#d62728'}}
                     }},
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.cres_capacity_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.cres_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Contingency Reserve',
                         line: {{color: '#9467bd'}}
                     }},
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.dr_capacity_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.dr_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Demand Response',
                         line: {{color: '#8c564b'}}
                     }},
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.il_capacity_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.il_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Interruptible Load',
                         line: {{color: '#e377c2'}}
                     }},
                     {{
-                        x: filteredPriceData.map(item => item.time),
-                        y: filteredPriceData.map(item => item.ec_energy_price),
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.ec_energy_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Consumer-side Energy',
@@ -668,80 +591,80 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 // Charge Discharge Chart
                 Plotly.newPlot('charge_discharge_chart', [
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.arb_discharge),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.arb_discharge),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Arbitrage Discharge',
                         line: {{color: '#1f77b4'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => -item.arb_charge),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => -item.arb_charge),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Arbitrage Charge',
                         line: {{color: '#17becf'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.reg_up),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.reg_up),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Up',
                         line: {{color: '#ff7f0e'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => -item.reg_down),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => -item.reg_down),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Down',
                         line: {{color: '#2ca02c'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.pres),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.pres),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Primary Reserve',
                         line: {{color: '#2ca02c'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.cres),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.cres),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Contingency Reserve',
                         line: {{color: '#d62728'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.dr),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.dr),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Demand Response',
                         line: {{color: '#8c564b'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.il),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.il),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Interruptible Load',
                         line: {{color: '#e377c2'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.storage_to_load),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.storage_to_load),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Storage to Load',
                         line: {{color: '#7f7f7f'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => -item.grid_to_storage),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => -item.grid_to_storage),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Grid to Storage',
@@ -758,8 +681,8 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 // SOC Chart
                 Plotly.newPlot('soc_chart', [
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.soc_percent * 100),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.soc_percent * 100),
                         type: 'scatter',
                         mode: 'lines',
                         fill: 'tozeroy',
@@ -777,73 +700,73 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                 // Operation Schedule Stacked Bar Chart
                 Plotly.newPlot('operation_schedule_chart', [
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.arb_discharge),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.arb_discharge),
                         name: 'Arbitrage Discharge',
                         type: 'bar',
                         marker: {{color: '#1f77b4'}}
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => -item.arb_charge),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.reg_up),
+                        name: 'Regulation Up',
+                        type: 'bar',
+                        marker: {{color: '#ff7f0e'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.pres),
+                        name: 'Primary Reserve',
+                        type: 'bar',
+                        marker: {{color: '#2ca02c'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.cres),
+                        name: 'Contingency Reserve',
+                        type: 'bar',
+                        marker: {{color: '#d62728'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.dr),
+                        name: 'Demand Response',
+                        type: 'bar',
+                        marker: {{color: '#8c564b'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.il),
+                        name: 'Interruptible Load',
+                        type: 'bar',
+                        marker: {{color: '#e377c2'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.storage_to_load),
+                        name: 'Storage to Load',
+                        type: 'bar',
+                        marker: {{color: '#7f7f7f'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => -item.arb_charge),
                         name: 'Arbitrage Charge',
                         type: 'bar',
                         marker: {{color: '#17becf'}},
                         offsetgroup: 'negative'
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.reg_up),
-                        name: 'Regulation Up',
-                        type: 'bar',
-                        marker: {{color: '#ff7f0e'}}
-                    }},
-                    {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => -item.reg_down),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => -item.reg_down),
                         name: 'Regulation Down',
                         type: 'bar',
                         marker: {{color: '#2ca02c'}},
                         offsetgroup: 'negative'
                     }},
                     {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.pres),
-                        name: 'Primary Reserve',
-                        type: 'bar',
-                        marker: {{color: '#2ca02c'}}
-                    }},
-                    {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.cres),
-                        name: 'Contingency Reserve',
-                        type: 'bar',
-                        marker: {{color: '#d62728'}}
-                    }},
-                    {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.dr),
-                        name: 'Demand Response',
-                        type: 'bar',
-                        marker: {{color: '#8c564b'}}
-                    }},
-                    {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.il),
-                        name: 'Interruptible Load',
-                        type: 'bar',
-                        marker: {{color: '#e377c2'}}
-                    }},
-                    {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => item.storage_to_load),
-                        name: 'Storage to Load',
-                        type: 'bar',
-                        marker: {{color: '#7f7f7f'}}
-                    }},
-                    {{
-                        x: filteredResultData.map(item => item.time),
-                        y: filteredResultData.map(item => -item.grid_to_storage),
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => -item.grid_to_storage),
                         name: 'Grid to Storage',
                         type: 'bar',
                         marker: {{color: '#bcbd22'}},
@@ -863,38 +786,38 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     document.getElementById('btm_services_chart').style.display = 'block';
                     Plotly.newPlot('btm_services_chart', [
                         {{
-                            x: filteredResultData.map(item => item.time),
-                            y: filteredResultData.map(item => item.grid_purchase),
+                            x: resultData.map(item => item.time),
+                            y: resultData.map(item => item.grid_purchase),
                             type: 'scatter',
                             mode: 'lines',
                             name: 'Grid Purchase',
                             line: {{color: '#1f77b4'}}
                         }},
                         {{
-                            x: filteredResultData.map(item => item.time),
-                            y: filteredResultData.map(item => item.load),
+                            x: resultData.map(item => item.time),
+                            y: resultData.map(item => item.load),
                             type: 'scatter',
                             mode: 'lines',
                             name: 'Load',
                             line: {{color: '#ff7f0e'}}
                         }},
                         {{
-                            x: filteredResultData.map(item => item.time),
-                            y: filteredResultData.map(item => item.grid_to_storage),
+                            x: resultData.map(item => item.time),
+                            y: resultData.map(item => item.grid_to_storage),
                             name: 'Grid to Storage',
                             type: 'bar',
                             marker: {{color: '#2ca02c'}}
                         }},
                         {{
-                            x: filteredResultData.map(item => item.time),
-                            y: filteredResultData.map(item => item.grid_to_load),
+                            x: resultData.map(item => item.time),
+                            y: resultData.map(item => item.grid_to_load),
                             name: 'Grid to Load',
                             type: 'bar',
                             marker: {{color: '#d62728'}}
                         }},
                         {{
-                            x: filteredResultData.map(item => item.time),
-                            y: filteredResultData.map(item => item.storage_to_load),
+                            x: resultData.map(item => item.time),
+                            y: resultData.map(item => item.storage_to_load),
                             name: 'Storage to Load',
                             type: 'bar',
                             marker: {{color: '#9467bd'}}
@@ -909,36 +832,6 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     {{responsive: true}});
                 }}
             }}
-
-            function resetOptimizationResultDefaults() {{
-                $('#timepicker_custom').data('daterangepicker').setStartDate(moment(defaultValuesOptimization.startDate));
-                $('#timepicker_custom').data('daterangepicker').setEndDate(moment(defaultValuesOptimization.endDate));
-                document.getElementById('startDate').value = moment(defaultValuesOptimization.startDate).format('YYYY-MM-DD');
-                filterDataByDateRange(moment(defaultValuesOptimization.startDate), moment(defaultValuesOptimization.endDate));
-                document.querySelector('input[name="dateRangeOption"][value="quick"]').checked = true;
-                toggleDateRange('quick');
-                highlightSelectedRange('quick', 'All');
-            }}
-
-            function resetEconomicAnalysisDefaults() {{
-                document.getElementById('fixed_capex').value = defaultValuesEconomic.fixed_capex;
-                document.getElementById('energy_capex').value = defaultValuesEconomic.energy_capex;
-                document.getElementById('power_capex').value = defaultValuesEconomic.power_capex;
-                document.getElementById('fixedOpex').value = defaultValuesEconomic.fixedOpex;
-                document.getElementById('energyOpex').value = defaultValuesEconomic.energyOpex;
-                document.getElementById('powerOpex').value = defaultValuesEconomic.powerOpex;
-                document.getElementById('discountRate').value = defaultValuesEconomic.discountRate * 100;
-                document.getElementById('revenueChange').value = defaultValuesEconomic.revenueChange;
-                document.getElementById('costChange').value = defaultValuesEconomic.costChange;
-                document.getElementById('cap_energy').innerText = defaultValuesEconomic.cap_energy;
-                document.getElementById('cap_power').innerText = defaultValuesEconomic.cap_power;
-                document.getElementById('annualRevenue').innerText = formatCurrency(defaultValuesEconomic.annualRevenue);
-                updateInitialCost();
-                updateAnnualCost();
-            }}
-
-            resetOptimizationResultDefaults(); // Initialize with default values for Optimization Result
-            resetEconomicAnalysisDefaults(); // Initialize with default values for Economic Analysis
         </script>
     </body>
     </html>
