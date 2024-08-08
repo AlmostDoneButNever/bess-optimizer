@@ -51,6 +51,7 @@ html_content = f"""
         <button class="duration-button" data-duration="1month">1 Month</button>
         <button class="duration-button" data-duration="allafter">All After</button>
     </div>
+    <h2 id="startDateText">Start Date: </h2>
     <h2 id="endDateText">End Date: </h2>
     <script>
         // List of allowed dates
@@ -77,6 +78,7 @@ html_content = f"""
         function addMonths(date, months) {{
             const result = new Date(date);
             result.setMonth(result.getMonth() + months);
+            result.setDate(result.getDate() - 1);
             return result;
         }}
 
@@ -95,29 +97,39 @@ html_content = f"""
             button.addEventListener('click', function() {{
                 const startDateInput = document.getElementById('startDatePicker');
                 if (startDateInput.value) {{
-                    const startDate = new Date(startDateInput.value);
+                    let startDate = new Date(startDateInput.value);
+                    startDate.setHours(0, 0, 0, 0); // Set start time to 00:00:00
                     if (!isDateAllowed(startDateInput.value)) {{
                         alert('Selected date is not allowed. Please choose a valid date.');
                         startDateInput.value = '';
+                        document.getElementById('startDateText').innerText = 'Start Date: ';
                         document.getElementById('endDateText').innerText = 'End Date: ';
                     }} else {{
                         let endDate;
                         switch (this.dataset.duration) {{
                             case '1day':
-                                endDate = addDays(startDate, 1);
+                                endDate = new Date(startDate); // Set end date to the same day
+                                endDate.setHours(23, 30, 0, 0); // Set end time to 23:30:00
                                 break;
                             case '1week':
                                 endDate = addWeeks(startDate, 1);
+                                endDate = getNearestAllowedDate(endDate);
+                                endDate.setHours(23, 30, 0, 0); // Set end time to 23:30:00
                                 break;
                             case '1month':
                                 endDate = addMonths(startDate, 1);
+                                endDate = getNearestAllowedDate(endDate);
+                                endDate.setHours(23, 30, 0, 0); // Set end time to 23:30:00
                                 break;
                             case 'allafter':
                                 endDate = new Date(allowedDates[allowedDates.length - 1]);
+                                endDate.setHours(23, 30, 0, 0); // Set end time to 23:30:00
                                 break;
                         }}
-                        endDate = getNearestAllowedDate(endDate);
-                        document.getElementById('endDateText').innerText = 'End Date: ' + endDate.toISOString().split('T')[0];
+                        document.getElementById('startDateText').innerText = 'Start Date: ' + startDate.toISOString().split('T')[0] + ' 00:00:00';
+                        document.getElementById('endDateText').innerText = 'End Date: ' + endDate.toISOString().split('T')[0] + ' 23:30:00';
+                        console.log('Start Date:', startDate.toISOString().split('T')[0] + ' 00:00:00');
+                        console.log('End Date:', endDate.toISOString().split('T')[0] + ' 23:30:00');
                     }}
                 }}
             }});

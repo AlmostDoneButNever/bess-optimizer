@@ -1,3 +1,5 @@
+import pandas as pd
+
 def generate_html(filename, bess, price_data, result_data, revenue_data, discount_rate, btm_service):
     # Convert data to JSON format
     revenue_data_json = revenue_data.to_json(orient='records', date_format='iso')
@@ -6,6 +8,12 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
 
     # Calculate the annual revenue by summing all items in the revenue_data series
     annual_revenue = bess['revenue']
+
+    # Extract dates from result_data and format them as strings
+    dates_list = result_data['time'].dt.strftime('%Y-%m-%d').tolist()
+
+    # Create JavaScript array from the dates list
+    js_dates_array = ", ".join([f"'{date}'" for date in dates_list])
 
     # Generate the HTML content with embedded JavaScript
     html_content = f"""
@@ -117,6 +125,27 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             .input-container .input-group:nth-child(odd) {{
                 margin-right: 20px;
             }}
+            .container {{
+                display: flex;
+                align-items: center;
+                margin-bottom: 20px;
+            }}
+            .datepicker {{
+                height: 40px;
+                margin-right: 10px;
+            }}
+            .duration-button {{
+                height: 40px;
+                margin-right: 10px;
+                padding: 0 20px;
+                cursor: pointer;
+            }}
+            .duration-button:hover {{
+                background-color: #ddd;
+            }}
+            .label {{
+                margin-right: 20px;
+            }}
         </style>
         <script>
             function setInitialStep(input) {{
@@ -158,6 +187,17 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
         <div id="bessOptimizationResult" class="content active">
             <h1>Optimization Result for BESS Operation</h1>
             <p>Optimization results for Battery Energy Storage System (BESS) operation will be displayed here, including price data, charging and discharging schedules, and state of charge over time.</p>
+            <div class="container">
+                <h4 class="label">Select a Start Date</h1>
+                <input type="date" id="startDatePicker" class="datepicker">
+                <button class="duration-button" data-duration="1day">1 Day</button>
+                <button class="duration-button" data-duration="1week">1 Week</button>
+                <button class="duration-button" data-duration="1month">1 Month</button>
+                <button class="duration-button" data-duration="allafter">All After</button>
+                <button id="clearAllButton" class="duration-button" style="background-color: #007bff; color: white; width: 100px;">Clear All</button>
+            </div>
+            <h2 id="endDateText" style="display: none;">End Date: </h2>
+            
             <div class="chart-container" id="prices_chart"></div>
             <div class="chart-container" id="revenue_breakdown_chart"></div>
             <div class="chart-container" id="soc_chart"></div>
@@ -253,6 +293,108 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
         </div>
 
         <script>
+            // List of allowed dates
+            const allowedDates = [{js_dates_array}];
+
+            // Function to check if a date is allowed
+            function isDateAllowed(date) {{
+                return allowedDates.includes(date);
+            }}
+
+            // Function to add days to a date
+            function addDays(date, days) {{
+                const result = new Date(date);
+                result.setDate(result.getDate() + days);
+                return result;
+            }}
+
+            // Function to add weeks to a date
+            function addWeeks(date, weeks) {{
+                return addDays(date, weeks * 7);
+            }}
+
+            // Function to add months to a date
+            function addMonths(date, months) {{
+                const result = new Date(date);
+                result.setMonth(result.getMonth() + months);
+                return result;
+            }}
+
+            // Function to get the nearest allowed date within the allowed range
+            function getNearestAllowedDate(date) {{
+                for (let i = 0; i < allowedDates.length; i++) {{
+                    if (new Date(allowedDates[i]) >= date) {{
+                        return new Date(allowedDates[i]);
+                    }}
+                }}
+                return new Date(allowedDates[allowedDates.length - 1]);
+            }}
+
+            // Function to filter data based on selected date range
+            function filterDataByDate(startDate, endDate, data) {{
+                const start = new Date(startDate + 'T00:00:00');
+                const end = new Date(endDate + 'T23:59:59');
+                end.setDate(end.getDate() - 1); // Subtract one day from the end date
+                return data.filter(d => new Date(d.time) >= start && new Date(d.time) <= end);
+            }}
+
+            // Event listener to handle date and duration selection
+            document.querySelectorAll('.duration-button').forEach(button => {{
+                button.addEventListener('click', function() {{
+                    const startDateInput = document.getElementById('startDatePicker');
+                    if (startDateInput.value) {{
+                        const startDate = new Date(startDateInput.value);
+                        if (!isDateAllowed(startDateInput.value)) {{
+                            alert('Selected date is not allowed. Please choose a valid date.');
+                            startDateInput.value = '';
+                            document.getElementById('endDateText').innerText = 'End Date: ';
+                        }} else {{
+                            let endDate;
+                            switch (this.dataset.duration) {{
+                                case '1day':
+                                    endDate = addDays(startDate, 1);
+                                    break;
+                                case '1week':
+                                    endDate = addWeeks(startDate, 1);
+                                    break;
+                                case '1month':
+                                    endDate = addMonths(startDate, 1);
+                                    break;
+                                case 'allafter':
+                                    endDate = new Date(allowedDates[allowedDates.length - 1]);
+                                    break;
+                            }}
+                            endDate = getNearestAllowedDate(endDate);
+                            document.getElementById('endDateText').innerText = 'End Date: ' + endDate.toISOString().split('T')[0];
+
+                            // Filter data based on selected date range
+                            const filteredPriceData = filterDataByDate(startDateInput.value, endDate.toISOString().split('T')[0], priceData);
+                            const filteredResultData = filterDataByDate(startDateInput.value, endDate.toISOString().split('T')[0], resultData);
+                            const filteredRevenueData = filterDataByDate(startDateInput.value, endDate.toISOString().split('T')[0], revenueData);
+
+                            // Update charts with filtered data
+                            renderCharts(filteredPriceData, filteredResultData);
+                            updateRevenueBreakdownChart(filteredRevenueData);
+                        }}
+                    }}
+                }});
+            }});
+
+            // Clear All Button Event Listener
+            document.getElementById('clearAllButton').addEventListener('click', function() {{
+                document.getElementById('startDatePicker').value = '';
+                document.getElementById('endDateText').innerText = 'End Date: ';
+                renderCharts(priceData, resultData);
+                updateRevenueBreakdownChart(revenueData);
+            }});
+
+            // Set min and max date for the start date picker
+            document.getElementById('startDatePicker').setAttribute('min', allowedDates[0]);
+            document.getElementById('startDatePicker').setAttribute('max', allowedDates[allowedDates.length - 1]);
+
+            // Set initial date to the earliest date in the list
+            document.getElementById('startDatePicker').value = allowedDates[0];
+
             var resultData = {result_data_json};
             var priceData = {price_data_json};
             var revenueData = {revenue_data_json};
@@ -714,36 +856,31 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         marker: {{color: '#ff7f0e'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.pres),
+                        x: resultData.map(item => item.pres),
                         name: 'Primary Reserve',
                         type: 'bar',
                         marker: {{color: '#2ca02c'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.cres),
+                        x: resultData.map(item => item.cres),
                         name: 'Contingency Reserve',
                         type: 'bar',
                         marker: {{color: '#d62728'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.dr),
+                        x: resultData.map(item => item.dr),
                         name: 'Demand Response',
                         type: 'bar',
                         marker: {{color: '#8c564b'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.il),
+                        x: resultData.map(item => item.il),
                         name: 'Interruptible Load',
                         type: 'bar',
                         marker: {{color: '#e377c2'}}
                     }},
                     {{
-                        x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.storage_to_load),
+                        x: resultData.map(item => item.storage_to_load),
                         name: 'Storage to Load',
                         type: 'bar',
                         marker: {{color: '#7f7f7f'}}
