@@ -1,6 +1,6 @@
 import pandas as pd
 
-def generate_html(filename, bess, price_data, result_data, revenue_data, discount_rate, btm_service):
+def generate_html(filename, bess, service, price_data, result_data, revenue_data, discount_rate, btm_service):
     # Convert data to JSON format
     revenue_data_json = revenue_data.to_json(orient='records', date_format='iso')
     price_data_json = price_data.reset_index().to_json(orient='records', date_format='iso')
@@ -143,6 +143,12 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             .duration-button:hover {{
                 background-color: #ddd;
             }}
+
+            .duration-button.active {{
+                background-color: #0056b3; /* Darker blue for active state */
+                color: white;
+            }}
+    
             .label {{
                 margin-right: 20px;
             }}
@@ -188,7 +194,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             <h1>Optimization Result for BESS Operation</h1>
             <p>Optimization results for Battery Energy Storage System (BESS) operation will be displayed here, including price data, charging and discharging schedules, and state of charge over time.</p>
             <div class="container">
-                <h4 class="label">Select a Start Date</h1>
+                <h4 class="label">Select a Start Date</h4>
                 <input type="date" id="startDatePicker" class="datepicker">
                 <button class="duration-button" data-duration="1day">1 Day</button>
                 <button class="duration-button" data-duration="1week">1 Week</button>
@@ -225,27 +231,27 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             <div class="input-container">
                 <div class="input-group">
                     <label for="fixed_capex">Fixed capital cost ($):</label>
-                    <input type="number" id="fixed_capex" name="fixed_capex" value="{bess['fixed_capex']}" min="0" oninput="updateInitialCost()">
-                </div>
-                <div class="input-group">
-                    <label for="energy_capex">Energy-related capital cost ($/kWh):</label>
-                    <input type="number" id="energy_capex" name="energy_capex" value="{bess['energy_capex']}" min="0" oninput="updateInitialCost()">
-                </div>
-                <div class="input-group">
-                    <label for="power_capex">Power-related capital cost ($/kW):</label>
-                    <input type="number" id="power_capex" name="power_capex" value="{bess['power_capex']}" min="0" oninput="updateInitialCost()">
+                    <input type="number" id="fixed_capex" name="fixed_capex" value="{bess['fixed_capex']:.2f}" min="0" oninput="updateInitialCost()">
                 </div>
                 <div class="input-group">
                     <label for="fixedOpex">Fixed O&M cost ($):</label>
-                    <input type="number" id="fixedOpex" name="fixedOpex" value="{bess['fixed_opex']}" min="0" oninput="updateAnnualCost()">
+                    <input type="number" id="fixedOpex" name="fixedOpex" value="{bess['fixed_opex']:.2f}" min="0" oninput="updateAnnualCost()">
+                </div>
+                <div class="input-group">
+                    <label for="energy_capex">Energy-related capital cost ($/kWh):</label>
+                    <input type="number" id="energy_capex" name="energy_capex" value="{bess['energy_capex']:.2f}" min="0" oninput="updateInitialCost()">
                 </div>
                 <div class="input-group">
                     <label for="energyOpex">Energy-related O&M cost ($/kWh):</label>
-                    <input type="number" id="energyOpex" name="energyOpex" value="{bess['energy_opex']}" min="0" oninput="updateAnnualCost()">
+                    <input type="number" id="energyOpex" name="energyOpex" value="{bess['energy_opex']:.2f}" min="0" oninput="updateAnnualCost()">
+                </div>
+                <div class="input-group">
+                    <label for="power_capex">Power-related capital cost ($/kW):</label>
+                    <input type="number" id="power_capex" name="power_capex" value="{bess['power_capex']:.2f}" min="0" oninput="updateInitialCost()">
                 </div>
                 <div class="input-group">
                     <label for="powerOpex">Power-related O&M cost ($/kW):</label>
-                    <input type="number" id="powerOpex" name="powerOpex" value="{bess['power_opex']}" min="0" oninput="updateAnnualCost()">
+                    <input type="number" id="powerOpex" name="powerOpex" value="{bess['power_opex']:.2f}" min="0" oninput="updateAnnualCost()">
                 </div>
             </div>
 
@@ -256,25 +262,26 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     <span id="initialCost">0.00</span>
                 </div>
                 <div class="input-group">
+                    <label for="discountRate">Discount rate (%):</label>
+                    <input type="number" id="discountRate" name="discountRate" value="{discount_rate * 100:.2f}" step="1" min="0" max="100" oninput="updateChart()">
+                </div>
+                <div class="input-group">
                     <label>Annual cost ($):</label>
                     <span id="annualCost">0.00</span>
+                </div>
+                <div class="input-group">
+                    <label for="costChange">Annual cost change (%):</label>
+                    <input type="number" id="costChange" name="costChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
                 </div>
                 <div class="input-group">
                     <label>Annual revenue ($):</label>
                     <span id="annualRevenue">{annual_revenue:,.2f}</span>
                 </div>
                 <div class="input-group">
-                    <label for="discountRate">Discount rate (%):</label>
-                    <input type="number" id="discountRate" name="discountRate" value="{discount_rate * 100}" step="1" min="0" max="100" oninput="updateChart()">
-                </div>
-                <div class="input-group">
                     <label for="revenueChange">Annual revenue change (%):</label>
                     <input type="number" id="revenueChange" name="revenueChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
                 </div>
-                <div class="input-group">
-                    <label for="costChange">Annual cost change (%):</label>
-                    <input type="number" id="costChange" name="costChange" value="0" step="1" min="-100" max="100" oninput="updateChart()">
-                </div>
+
                 <div class="input-group">
                     <button onclick="resetEconomicAnalysisDefaults()">Reset to Default Values</button>
                 </div>
@@ -442,7 +449,9 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     title: 'Breakdown of Revenues',
                     xaxis: {{title: 'Revenue ($)'}},
                     yaxis: {{title: 'Revenue Sources', automargin: true}},
-                    margin: {{ t: 50, l: 200, r: 0, b: 50 }}
+                    margin: {{ t: 50, l: 200, r: 0, b: 50 }},
+                    height: 450
+
                 }}, 
                 {{responsive: true}});
             }}
@@ -632,13 +641,13 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
             }}
 
             function resetEconomicAnalysisDefaults() {{
-                document.getElementById('fixed_capex').value = {bess['fixed_capex']};
-                document.getElementById('energy_capex').value = {bess['energy_capex']};
-                document.getElementById('power_capex').value = {bess['power_capex']};
-                document.getElementById('fixedOpex').value = {bess['fixed_opex']};
-                document.getElementById('energyOpex').value = {bess['energy_opex']};
-                document.getElementById('powerOpex').value = {bess['power_opex']};
-                document.getElementById('discountRate').value = {discount_rate * 100};
+                document.getElementById('fixed_capex').value = '{bess['fixed_capex']:.2f}';
+                document.getElementById('energy_capex').value = '{bess['energy_capex']:.2f}';
+                document.getElementById('power_capex').value = '{bess['power_capex']:.2f}';
+                document.getElementById('fixedOpex').value = '{bess['fixed_opex']:.2f}';
+                document.getElementById('energyOpex').value = '{bess['energy_opex']:.2f}';
+                document.getElementById('powerOpex').value = '{bess['power_opex']:.2f}';
+                document.getElementById('discountRate').value = '{discount_rate * 100:.2f}';
                 document.getElementById('revenueChange').value = 0;
                 document.getElementById('costChange').value = 0;
                 updateInitialCost();
@@ -657,7 +666,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
 
             function renderCharts(priceData, resultData) {{
                 // Prices Chart
-                Plotly.newPlot('prices_chart', [
+                const plotData = [
                     {{
                         x: priceData.map(item => item.time),
                         y: priceData.map(item => item.arb_energy_price),
@@ -666,29 +675,50 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         name: 'Energy (Wholesale)',
                         line: {{color: '#1f77b4'}}
                     }},
+                ];
+
+                if ({service['reg_symmetric']} != 1) {{
+                    plotData.push(
                     {{
                         x: priceData.map(item => item.time),
-                        y: priceData.map(item => item.reg_up_price),
+                        y: priceData.map(item => item.reg_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Up',
-                        line: {{color: '#ff7f0e'}}
+                        line: {{color: '#CC5500'}}
                     }},
                     {{
                         x: priceData.map(item => item.time),
-                        y: priceData.map(item => item.reg_down_price),
+                        y: priceData.map(item => item.reg_down_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Down',
-                        line: {{color: '#2ca02c'}}
-                    }},
+                        line: {{color: '#ff7f0e'}}
+                    }}
+                    );
+                }};
+
+                if ({service['reg_symmetric']} == 1) {{
+                    plotData.push(
+                    {{
+                        x: priceData.map(item => item.time),
+                        y: priceData.map(item => item.reg_capacity_price),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Regulation',
+                        line: {{color: '#CC5500'}}
+                    }}
+                    );
+                }};
+
+                plotData.push(
                     {{
                         x: priceData.map(item => item.time),
                         y: priceData.map(item => item.pres_capacity_price),
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Primary Reserve',
-                        line: {{color: '#d62728'}}
+                        line: {{color: '#006400'}}
                     }},
                     {{
                         x: priceData.map(item => item.time),
@@ -696,7 +726,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Contingency Reserve',
-                        line: {{color: '#9467bd'}}
+                        line: {{color: '#808000'}}
                     }},
                     {{
                         x: priceData.map(item => item.time),
@@ -704,7 +734,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Demand Response',
-                        line: {{color: '#8c564b'}}
+                        line: {{color: '#4B0082'}}
                     }},
                     {{
                         x: priceData.map(item => item.time),
@@ -720,15 +750,18 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Consumer-side Energy',
-                        line: {{color: '#7f7f7f'}}
-                    }}
-                ], {{
+                        line: {{color: '#7f7f7f'}} 
+                    }}, 
+                )
+
+                
+                Plotly.newPlot('prices_chart', plotData, {{
                     title: 'Energy Prices Over Time',
                     xaxis: {{title: 'Time'}},
                     yaxis: {{title: 'Price ($/MWh)'}},
                     legend: {{ orientation: "h", y: 1.1 }}
-                }}, 
-                {{responsive: true}});
+                }}, {{responsive: true}});
+
 
                 // Charge Discharge Chart
                 Plotly.newPlot('charge_discharge_chart', [
@@ -754,7 +787,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Up',
-                        line: {{color: '#ff7f0e'}}
+                        line: {{color: '#CC5500'}}
                     }},
                     {{
                         x: resultData.map(item => item.time),
@@ -762,7 +795,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Regulation Down',
-                        line: {{color: '#2ca02c'}}
+                        line: {{color: '#ff7f0e'}}
                     }},
                     {{
                         x: resultData.map(item => item.time),
@@ -770,7 +803,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Primary Reserve',
-                        line: {{color: '#2ca02c'}}
+                        line: {{color: '#006400'}}
                     }},
                     {{
                         x: resultData.map(item => item.time),
@@ -778,7 +811,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Contingency Reserve',
-                        line: {{color: '#d62728'}}
+                        line: {{color: '#808000'}}
                     }},
                     {{
                         x: resultData.map(item => item.time),
@@ -786,7 +819,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Demand Response',
-                        line: {{color: '#8c564b'}}
+                        line: {{color: '#4B0082'}}
                     }},
                     {{
                         x: resultData.map(item => item.time),
@@ -810,7 +843,7 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         type: 'scatter',
                         mode: 'lines',
                         name: 'Grid to Storage',
-                        line: {{color: '#bcbd22'}}
+                        line: {{color: '#654321'}}
                     }},
                 ], {{
                     title: 'Operation Schedule',
@@ -850,43 +883,6 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     }},
                     {{
                         x: resultData.map(item => item.time),
-                        y: resultData.map(item => item.reg_up),
-                        name: 'Regulation Up',
-                        type: 'bar',
-                        marker: {{color: '#ff7f0e'}}
-                    }},
-                    {{
-                        x: resultData.map(item => item.pres),
-                        name: 'Primary Reserve',
-                        type: 'bar',
-                        marker: {{color: '#2ca02c'}}
-                    }},
-                    {{
-                        x: resultData.map(item => item.cres),
-                        name: 'Contingency Reserve',
-                        type: 'bar',
-                        marker: {{color: '#d62728'}}
-                    }},
-                    {{
-                        x: resultData.map(item => item.dr),
-                        name: 'Demand Response',
-                        type: 'bar',
-                        marker: {{color: '#8c564b'}}
-                    }},
-                    {{
-                        x: resultData.map(item => item.il),
-                        name: 'Interruptible Load',
-                        type: 'bar',
-                        marker: {{color: '#e377c2'}}
-                    }},
-                    {{
-                        x: resultData.map(item => item.storage_to_load),
-                        name: 'Storage to Load',
-                        type: 'bar',
-                        marker: {{color: '#7f7f7f'}}
-                    }},
-                    {{
-                        x: resultData.map(item => item.time),
                         y: resultData.map(item => -item.arb_charge),
                         name: 'Arbitrage Charge',
                         type: 'bar',
@@ -895,11 +891,53 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     }},
                     {{
                         x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.reg_up),
+                        name: 'Regulation Up',
+                        type: 'bar',
+                        marker: {{color: '#CC5500'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
                         y: resultData.map(item => -item.reg_down),
                         name: 'Regulation Down',
                         type: 'bar',
-                        marker: {{color: '#2ca02c'}},
+                        marker: {{color: '#ff7f0e'}},
                         offsetgroup: 'negative'
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.pres),
+                        name: 'Primary Reserve',
+                        type: 'bar',
+                        marker: {{color: '#006400'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.cres),
+                        name: 'Contingency Reserve',
+                        type: 'bar',
+                        marker: {{color: '#808000'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.dr),
+                        name: 'Demand Response',
+                        type: 'bar',
+                        marker: {{color: '#4B0082'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.il),
+                        name: 'Interruptible Load',
+                        type: 'bar',
+                        marker: {{color: '#e377c2'}}
+                    }},
+                    {{
+                        x: resultData.map(item => item.time),
+                        y: resultData.map(item => item.storage_to_load),
+                        name: 'Storage to Load',
+                        type: 'bar',
+                        marker: {{color: '#7f7f7f'}}
                     }},
                     {{
                         x: resultData.map(item => item.time),
@@ -940,13 +978,6 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                         }},
                         {{
                             x: resultData.map(item => item.time),
-                            y: resultData.map(item => item.grid_to_storage),
-                            name: 'Grid to Storage',
-                            type: 'bar',
-                            marker: {{color: '#2ca02c'}}
-                        }},
-                        {{
-                            x: resultData.map(item => item.time),
                             y: resultData.map(item => item.grid_to_load),
                             name: 'Grid to Load',
                             type: 'bar',
@@ -958,7 +989,15 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                             name: 'Storage to Load',
                             type: 'bar',
                             marker: {{color: '#9467bd'}}
-                        }}
+                        }},
+                        {{
+                            x: resultData.map(item => item.time),
+                            y: resultData.map(item => item.grid_to_storage),
+                            name: 'Grid to Storage',
+                            type: 'bar',
+                            marker: {{color: '#2ca02c'}}
+                        }},
+
                     ], {{
                         title: 'BTM Services',
                         barmode: 'stack',
@@ -969,6 +1008,8 @@ def generate_html(filename, bess, price_data, result_data, revenue_data, discoun
                     {{responsive: true}});
                 }}
             }}
+
+            
         </script>
     </body>
     </html>
