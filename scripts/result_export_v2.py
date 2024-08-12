@@ -1016,7 +1016,7 @@ def generate_html(filename, bess, service, price_data, result_data, revenue_data
     """
 
     # Write the HTML content to a file
-    with open('result/' + filename + ".html", 'w') as file:
+    with open(filename + ".html", 'w') as file:
         file.write(html_content)
 
     print("HTML file generated:" + filename + ".html")

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Output</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .section {
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 100%;
+            max-width: 900px;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #555;
+        }
+        .input-field {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        label {
+            flex: 0 0 150px;
+            font-weight: bold;
+            margin-right: 10px;
+            color: #555;
+        }
+        input[type="range"] {
+            flex-grow: 1;
+            margin-right: 15px;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            background: #ddd;
+            border-radius: 5px;
+            outline: none;
+            transition: background 0.3s;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3498db;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #3498db;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]:hover {
+            background: #ccc;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        input[type="number"]:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        .submit-button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 100%;
+        }
+        .submit-button:hover {
+            background-color: #2980b9;
+        }
+        .submit-button:focus {
+            outline: none;
+        }
+        .back-button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .back-button:hover {
+            background-color: #2980b9;
+        }
+        .back-button:focus {
+            outline: none;
+        }
+        .back-button-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Input Section -->
+    <div class="section" id="input-section">
+        <div class="section-title">Input</div>
+        <form method="POST" action="{{ url_for('index') }}" onsubmit="showProcessingMessage()">
+            <div class="input-field">
+                <label for="power_capacity">Power Capacity ($/kW):</label>
+                <input type="range" id="power_capacity" name="power_capacity" min="0" max="10" value="{{ power_capacity or 1 }}" oninput="syncInput('power_capacity')">
+                <input type="number" id="power_capacity_number" min="0" max="10" value="{{ power_capacity or 1 }}" oninput="syncSlider('power_capacity')">
+            </div>
+            <div class="input-field">
+                <label for="energy_capacity">Energy Capacity ($/kWh):</label>
+                <input type="range" id="energy_capacity" name="energy_capacity" min="0" max="10" value="{{ energy_capacity or 4 }}" oninput="syncInput('energy_capacity')">
+                <input type="number" id="energy_capacity_number" min="0" max="10" value="{{ energy_capacity or 4 }}" oninput="syncSlider('energy_capacity')">
+            </div>
+            <!-- Submit Button -->
+            <div class="input-field">
+                <button type="submit" class="submit-button">Submit</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Section -->
+    <div class="section">
+        <div class="section-title">Results</div>
+        <div id="results">
+            {% if generated_html %}
+                {{ generated_html | safe }}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Back Button to Return to the Input Page -->
+    <div class="back-button-container">
+        <form action="{{ url_for('index') }}" method="get">
+            <button type="submit" class="back-button">Back to Input</button>
+        </form>
+    </div>
+
+    <script>
+        function syncInput(id) {
+            var slider = document.getElementById(id);
+            var input = document.getElementById(id + '_number');
+            input.value = slider.value;
+        }
+
+        function syncSlider(id) {
+            var slider = document.getElementById(id);
+            var input = document.getElementById(id + '_number');
+            slider.value = input.value;
+        }
+
+        function showProcessingMessage() {
+            document.getElementById('results').innerHTML = '<p>Solving in process...</p>';
+        }
+    </script>
+
+</body>
+</html>
