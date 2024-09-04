@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BESS Tool - Upload Excel File</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"],
+        input[type="text"],
+        input[type="submit"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 0 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        input[type="submit"] {
+            background-color: #2c3e50;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        input[type="submit"]:hover {
+            background-color: #34495e;
+        }
+        #progress {
+            margin-top: 15px;
+            font-style: italic;
+            color: #e67e22;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to the BESS Tool</h1>
+        <p>Please enter the details below and upload your Excel file.</p>
+        <form action="/result" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="battery_power_capacity">Battery Power Capacity (MW):</label>
+                <input type="text" id="battery_power_capacity" name="battery_power_capacity" placeholder="Enter power capacity">
+            </div>
+            <div class="form-group">
+                <label for="energy_capacity">Energy Capacity (MWh):</label>
+                <input type="text" id="energy_capacity" name="energy_capacity" placeholder="Enter energy capacity">
+            </div>
+            <div class="form-group">
+                <label for="file">Upload Excel File:</label>
+                <input type="file" id="file" name="file">
+            </div>
+            <input type="submit" value="Upload and Solve" onclick="showProgress()">
+        </form>        
+        <div id="progress" style="display:none;">
+            <p>Solving... Please wait.</p>
+        </div>
+    </div>
+    <script>
+        function showProgress() {
+            document.getElementById('progress').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
