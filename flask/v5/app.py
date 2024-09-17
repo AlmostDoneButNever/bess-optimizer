@@ -31,7 +31,7 @@ all_services_dict = {
 }
 
 all_price_options = ['Nominal', "Nominal x 1.5", 'Nominal x 2']
-all_profile_options = ['Commercial', "Industrial", 'Residential']
+all_profile_options = ['Commercial', 'Residential']
 all_tariffplan_options = ['Time of use', 'Fixed']
 
 @app.route('/', methods=['GET', 'POST'])
@@ -58,14 +58,16 @@ def index():
         for option in selected_profile_options:
             if option == "Commercial":
                 excel_name = 'data_commercial'
-            elif option == "Industrial":
-                excel_name = 'data_industrial'
-            if option == "Residential":
+            # elif option == "Industrial":
+            #     excel_name = 'data_industrial'
+            elif option == "Residential":
                 excel_name = 'data_residential'
 
         # Load the Excel file from the templates folder
         file_path = pkg_resources.resource_filename(__name__, 'templates/' + excel_name + '.xlsx')
         data, basis, bess, service, revenue_change = data_import(file_path)
+
+        print(data['load'])
 
         bess['cap_energy'] = float(energy_capacity)
         bess['cap_power'] = float(power_capacity)

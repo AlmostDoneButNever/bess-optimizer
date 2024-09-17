@@ -169,23 +169,29 @@
             outline: none;
         }
 
-        .checkbox-title {
-            font-weight: bold;
-            margin: 15px 0 0px;
-            color: #333;
-        }
-
-        .checkbox-field {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
         .checkbox-label {
             display: flex;
             align-items: center;
             gap: 10px;
             font-size: 14px;
+        }
+
+        .checkbox-title {
+            font-weight: bold;
+            color: #333;
+            margin-top: 15px; /* Ensures consistent top margin for all titles */
+            margin-bottom: 5px; /* Reduces space between title and fields */
+        }
+
+        .checkbox-field {
+            display: flex;
+            flex-direction: column;
+            gap: 10px; /* Maintains consistent gap between checkbox options */
+        }
+
+        #consumer-inputs .checkbox-title, 
+        #consumer-inputs .checkbox-field {
+            margin-top: 15px; /* Ensures consistency when these elements become visible */
         }
 
         .submit-button {
@@ -215,6 +221,10 @@
             border-radius: 10px;
             border: 1px solid #ddd;
         }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -241,7 +251,7 @@
                     <div class="checkbox-title">Cost Parameters</div>
                     <div class="input-field">
                         <label for="fixed_cost">Fixed Cost ($'000):</label>
-                        <input type="number" id="fixed_cost" name="fixed_cost" value="{{ fixed_cost or '1000' }}" step="10" min="0">
+                        <input type="number" id="fixed_cost" name="fixed_cost" value="{{ fixed_cost or '0' }}" step="10" min="0">
                     </div>
                     <div class="input-field">
                         <label for="energy_cost">Energy Cost ($/kWh):</label>
@@ -260,12 +270,11 @@
                     <div class="checkbox-field">
                         {% for option in all_services %}
                         <label class="checkbox-label">
-                            <input type="radio" name="bess_service" value="{{ option }}"
+                            <input type="radio" name="bess_service" value="{{ option }}" onclick="toggleConsumerInputs()" 
                             {% if option in selected_services %}checked{% endif %}>
                             {{ option }}
                         </label>
                         {% endfor %}
-     
                     </div>
 
                     <div class="checkbox-title">Select Basis for Electricity Tariff</div>
@@ -279,26 +288,28 @@
                         {% endfor %}
                     </div>
 
-                    <div class="checkbox-title">Select Electricity Tariff Plan</div>
-                    <div class="checkbox-field">
-                        {% for option in all_tariffplan_options %}
-                        <label class="checkbox-label">
-                            <input type="radio" name="tariff_plan" value="{{ option }}"
-                            {% if option in selected_tariffplan_options %}checked{% endif %}>
-                            {{ option }}
-                        </label>
-                        {% endfor %}
-                    </div>
+                    <div id="consumer-inputs" class="hidden">
+                        <div class="checkbox-title">Select Electricity Tariff Plan</div>
+                        <div class="checkbox-field">
+                            {% for option in all_tariffplan_options %}
+                            <label class="checkbox-label">
+                                <input type="radio" name="tariff_plan" value="{{ option }}"
+                                {% if option in selected_tariffplan_options %}checked{% endif %}>
+                                {{ option }}
+                            </label>
+                            {% endfor %}
+                        </div>
 
-                    <div class="checkbox-title">Select Basis for Load Profile</div>
-                    <div class="checkbox-field">
-                        {% for option in all_profile_options %}
-                        <label class="checkbox-label">
-                            <input type="radio" name="load_profile" value="{{ option }}"
-                            {% if option in selected_profile_options %}checked{% endif %}>
-                            {{ option }}
-                        </label>
-                        {% endfor %}
+                        <div class="checkbox-title">Select Basis for Load Profile</div>
+                        <div class="checkbox-field">
+                            {% for option in all_profile_options %}
+                            <label class="checkbox-label">
+                                <input type="radio" name="load_profile" value="{{ option }}"
+                                {% if option in selected_profile_options %}checked{% endif %}>
+                                {{ option }}
+                            </label>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
 
@@ -350,6 +361,21 @@
         function expandInputSection() {
             document.getElementById('input-fields').style.display = 'block';
         }
+
+        function toggleConsumerInputs() {
+            var bessService = document.querySelector('input[name="bess_service"]:checked').value;
+            var consumerInputs = document.getElementById('consumer-inputs');
+            if (bessService === "Consumer-side") {
+                consumerInputs.classList.remove("hidden");
+            } else {
+                consumerInputs.classList.add("hidden");
+            }
+        }
+
+        // Call this function on page load to ensure the correct fields are displayed if the form is pre-filled
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleConsumerInputs();
+        });
     </script>
 
 </body>
