@@ -10,10 +10,12 @@ def data_import(path):
     bess = {}
 
     data['basis'] = pd.read_excel(path, sheet_name= 'basis', usecols="C:D", index_col=0, names = ['parameter', 'value'])
-    data['basis']  = data['basis'].dropna().drop(['Tag']).replace({'YES': 1, 'NO': 0})
+    data['basis'] = data['basis'].dropna().drop(['Tag'])
+    data['basis']['value'] = data['basis']['value'].apply(lambda x: 1 if x == 'YES' else (0 if x == 'NO' else x))
 
     data['bess'] = pd.read_excel(path, sheet_name= 'bess', usecols="C:D", index_col=0, names = ['parameter', 'value'])
-    data['bess']  = data['bess'].dropna().drop(['Tag', np.nan]).replace({'YES': 1, 'NO': 0})
+    data['bess']  = data['bess'].dropna().drop(['Tag', np.nan])
+    data['bess']['value'] = data['bess']['value'].apply(lambda x: 1 if x == 'YES' else (0 if x == 'NO' else x))
 
     data['schedule'] = pd.read_excel(path, sheet_name= 'schedule', index_col=0, skiprows=7)
     data['schedule'].columns = ['arb', 'reg', 'pres','cres', 'ec', 'dr', 'il']
